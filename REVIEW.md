@@ -1,3 +1,18 @@
+# TrueCast Atmosphere 4.0 review
+
+16 November 2026. Current release details and primary sources: [ATMOSPHERE-RELEASE.md](ATMOSPHERE-RELEASE.md). Earlier reviews below are historical.
+
+- Fourteen unit scenarios include the prior refresh checks plus WMS source-time parsing/cadence, fresh run validation, bounded future horizons, observed-only imagery and missing versus zero air quality.
+- New browser scenarios cover direct 16-day navigation, returning from daily to a selected hourly forecast, exact future/run parameters, truthful labels while images load/fail, all four future products, viewport requests, NOAA observed layers and playback pause.
+- Air/pollen review covers 48 plotted hours, exact-hour values, pollutant units, modeled zero pollen and an explicit unavailable state.
+- Existing suites cover quiet source refresh, offline recovery, city-switch races, station quality/freshness, official warning/tropical geometry, five viewport sizes and actual service-worker upgrades. The complete shell now includes 19 required files and locally bundled Leaflet.
+- Live DWD PNGs were checked for precipitation, temperature, wind and pressure. Live NOAA imagery and live CAMS air/pollen were exercised. A deliberately invalid DWD model-run parameter returned a source exception, confirming run selection is honored.
+- Current phone screenshots were reviewed for Today, future maps, lightning and air quality. Missing arrow/play glyphs were replaced with SVG/CSS. The daylight block was moved into the planner to keep Today compact. Dark defaults, Fahrenheit and simulated iPhone safe areas remain.
+
+These are browser/endpoint and simulated-device checks; they do not certify physical iPhone/Safari behavior or a worldwide forecast-accuracy advantage.
+
+---
+
 # TrueCast 3.1 refresh and source review
 
 16 November 2026. This section describes the current release; the 3.0 review below remains historical context.

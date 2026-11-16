@@ -1,3 +1,5 @@
+> Current release: [TrueCast Atmosphere 4.0](ATMOSPHERE-RELEASE.md) adds free DWD future maps, NOAA-derived lightning density, infrared satellite, a 16-day outlook and air/pollen forecasts. Earlier implementation/availability descriptions below are historical.
+
 > Provider/refresh update: [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) contains current 3.1 findings, including Xweather/Foreca free allowances, Google experimental minute-forecast restrictions and iPhone background limits. This original document is historical planning context.
 
 > Current release: TrueCast 3.1 is implemented and deployed through the existing Pages workflow. README.md and COMPETITOR-RESEARCH.md describe current behavior; this original plan remains as historical research and roadmap context.

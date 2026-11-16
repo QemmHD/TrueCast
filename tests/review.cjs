@@ -16,7 +16,7 @@ if (process.env.TRUECAST_BROWSER_PATH)
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(base, { waitUntil: "domcontentloaded" });
     await page.waitForFunction(
-      () => document.querySelectorAll(".day").length === 10,
+      () => document.querySelectorAll(".day").length === 16,
     );
     const go = async (route) => {
       await page.locator(`[data-nav=${route}]`).click();
@@ -119,7 +119,7 @@ if (process.env.TRUECAST_BROWSER_PATH)
     await page.waitForFunction(
       () =>
         document.querySelector("#place").textContent === "New York" &&
-        document.querySelectorAll(".day").length === 10,
+        document.querySelectorAll(".day").length === 16,
     );
     await go("today");
     await page.locator("#save").click();
@@ -374,7 +374,7 @@ if (process.env.TRUECAST_BROWSER_PATH)
     await page.locator("#units").click();
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForFunction(
-      () => document.querySelectorAll(".day").length === 10,
+      () => document.querySelectorAll(".day").length === 16,
     );
     assert.equal(await page.locator("#units").innerText(), "°C / °F");
     await page.locator("#units").click();
@@ -395,7 +395,7 @@ if (process.env.TRUECAST_BROWSER_PATH)
     );
     await go("today");
     assert.equal(await page.locator("#offline-banner").isVisible(), true);
-    assert.equal(await page.locator(".day").count(), 10);
+    assert.equal(await page.locator(".day").count(), 16);
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForFunction(

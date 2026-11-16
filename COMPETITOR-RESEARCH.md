@@ -1,3 +1,5 @@
+> Current release: [TrueCast Atmosphere 4.0](ATMOSPHERE-RELEASE.md) adds free DWD future maps, NOAA-derived lightning density, infrared satellite, a 16-day outlook and air/pollen forecasts. Earlier implementation/availability descriptions below are historical.
+
 # TrueCast: research behind the professional weather interface
 
 Checked 16 November 2026 against developer/support sources. This compares documented capabilities, not measured forecast accuracy or a hands-on audit of every competitor screen. Regional availability and subscription entitlements differ. The interface uses its own layout and assets.

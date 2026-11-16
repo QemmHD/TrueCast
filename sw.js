@@ -1,14 +1,19 @@
 // Cache only the app shell. Forecast APIs and map tiles retain normal network behavior.
-const CACHE = "truecast-shell-v3.1";
+const CACHE = "truecast-shell-v4";
 const ROOT = new URL("./", self.location.href);
 const SHELL = [
   "index.html",
   "style.css",
+  "atmosphere.css",
+  "vendor/leaflet.css",
+  "vendor/leaflet.js",
   "app.js",
   "api.js",
   "refresh.js",
   "forecast-time.js",
   "sources.js",
+  "weather-maps.js",
+  "environment.js",
   "radar.js",
   "ui.js",
   "install.js",

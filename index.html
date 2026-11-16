@@ -37,15 +37,10 @@
     <link href="./icons/icon-192.png" rel="icon" type="image/png" />
     <script defer="" src="./install.js"></script>
     <title>TrueCast · Weather, in perspective.</title>
-    <link
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      rel="stylesheet"
-    />
+    <link href="./vendor/leaflet.css" rel="stylesheet" />
     <link href="./style.css" rel="stylesheet" />
-    <script
-      defer=""
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    ></script>
+    <link href="./atmosphere.css" rel="stylesheet" />
+    <script defer="" src="./vendor/leaflet.js"></script>
     <script src="./app.js" type="module"></script>
   </head>
   <body>
@@ -75,7 +70,7 @@
             <path
               d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15"
             ></path></svg
-          ><span>Radar</span></a
+          ><span>Maps</span></a
         ><a data-nav="plan" href="#plan"
           ><svg aria-hidden="true" viewbox="0 0 24 24">
             <path
@@ -132,6 +127,18 @@
       >
         <div class="current-sky">
           <div aria-hidden="true" class="sky-noise"></div>
+          <div aria-hidden="true" class="sky-aura"></div>
+          <svg
+            class="sky-contours"
+            aria-hidden="true"
+            viewBox="0 0 600 300"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M-40 245Q170 75 640 215M-40 270Q170 100 640 240M-40 295Q170 125 640 265M-40 320Q170 150 640 290"
+            />
+            <path d="M-30 220Q180 50 630 190" class="horizon-glint" />
+          </svg>
           <div class="current-top">
             <span id="date">YOUR LOCAL FORECAST</span
             ><button aria-label="Save this place" class="save-button" id="save">
@@ -150,6 +157,41 @@
           </div>
           <span class="data-badge" id="freshness">MODEL FORECAST</span
           ><span class="sr-only" id="place">London</span>
+          <div class="hero-links">
+            <a href="#forecast" id="hero-outlook"
+              ><span>Extended outlook</span
+              ><b
+                ><span id="hero-outlook-days">16 days</span>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 16 16"
+                  width="12"
+                  height="12"
+                >
+                  <path
+                    d="M4 12 12 4M4 4h8v8"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                  /></svg></b></a
+            ><a href="#map" id="hero-future-map"
+              ><span>Explore the atmosphere</span
+              ><b
+                >Future maps
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 16 16"
+                  width="12"
+                  height="12"
+                >
+                  <path
+                    d="M4 12 12 4M4 4h8v8"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                  /></svg></b
+            ></a>
+          </div>
         </div>
         <a class="weather-brief" href="#forecast"
           ><span aria-hidden="true" class="brief-icon"
@@ -170,7 +212,22 @@
         >
         <div class="hour-preview surface">
           <div class="section-line">
-            <span>NEXT 12 HOURS</span><a href="#forecast">Full forecast ›</a>
+            <span>NEXT 12 HOURS</span
+            ><a href="#forecast"
+              >Explore forecast
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 16 16"
+                width="12"
+                height="12"
+              >
+                <path
+                  d="M4 12 12 4M4 4h8v8"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                /></svg
+            ></a>
           </div>
           <div class="preview-hours" id="preview-hours"></div>
         </div>
@@ -246,24 +303,6 @@
             ></i>
           </button>
         </div>
-        <button class="sun-strip surface" data-detail="sun">
-          <span aria-hidden="true" class="sun-small"
-            ><svg
-              aria-hidden="true"
-              fill="none"
-              stroke="currentColor"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.5"
-              viewbox="0 0 24 24"
-            >
-              <path
-                d="M2 17h20M5 17a7 7 0 0 1 14 0M12 3v3M3 8l2 2m14 0 2-2"
-              ></path></svg></span
-          ><span><small>SUNSET</small><strong id="today-sunset">—</strong></span
-          ><span class="daylight-track"><i id="daylight-progress"></i></span
-          ><span class="sun-strip-end" id="daylight-label">Daylight</span>
-        </button>
         <div class="today-actions">
           <button id="all-conditions">
             All conditions
@@ -293,7 +332,7 @@
         <div aria-label="Forecast view" class="segmented forecast-tabs">
           <button aria-pressed="true" data-forecast-view="hourly">Hourly</button
           ><button aria-pressed="false" data-forecast-view="daily">
-            10 days
+            16 days
           </button>
         </div>
         <div id="hourly-view">
@@ -308,7 +347,13 @@
               <option value="24">24 hours</option>
               <option value="72">72 hours</option>
               <option value="144">144 hours</option>
+              <option value="384">16 days</option>
             </select>
+          </div>
+          <div class="forecast-intro">
+            <span class="eyebrow">THE HOURS AHEAD</span>
+            <h2>See the day unfold.</h2>
+            <p id="forecast-story">Your forecast, hour by hour.</p>
           </div>
           <div class="selected-forecast">
             <p id="selected-date">Select an hour</p>
@@ -330,6 +375,13 @@
           <div aria-live="polite" class="hour-detail" id="hour-detail"></div>
         </div>
         <div hidden="" id="daily-view">
+          <div class="outlook-intro">
+            <span class="eyebrow">THE BIGGER PICTURE</span>
+            <h2 id="outlook-title">Your next 16 days.</h2>
+            <p id="outlook-summary" class="muted">
+              Daily trends and changing conditions.
+            </p>
+          </div>
           <div class="section-line daily-legend">
             <span>DAY / CONDITIONS</span><span>LOW → HIGH · RAIN</span>
           </div>
@@ -351,6 +403,11 @@
         <div class="map-top">
           <div aria-label="Map layer" class="segmented map-layers">
             <button aria-pressed="true" data-layer="radar">Radar</button
+            ><button aria-pressed="false" data-layer="forecast">Future</button
+            ><button aria-pressed="false" data-layer="lightning">
+              Lightning</button
+            ><button aria-pressed="false" data-layer="satellite">
+              Satellite</button
             ><button aria-pressed="false" data-layer="warnings">Warnings</button
             ><button aria-pressed="false" data-layer="tropical">
               Tropical
@@ -378,6 +435,59 @@
             ><strong id="map-point-name">Map pin</strong>
           </div>
           <button id="point-forecast">View forecast ›</button>
+        </div>
+        <div class="weather-console" id="weather-console" hidden>
+          <div
+            class="forecast-products"
+            id="forecast-products"
+            aria-label="Future map product"
+          >
+            <button data-map-product="precip" aria-pressed="true">
+              Precip
+            </button>
+            <button data-map-product="temperature" aria-pressed="false">
+              Temp
+            </button>
+            <button data-map-product="wind" aria-pressed="false">Wind</button>
+            <button data-map-product="pressure" aria-pressed="false">
+              Pressure
+            </button>
+          </div>
+          <div class="weather-console-heading">
+            <div>
+              <small id="weather-time-kind">FUTURE FORECAST</small
+              ><strong id="weather-time">Choose a time</strong>
+            </div>
+            <button id="weather-refresh" aria-label="Refresh weather map">
+              ↻
+            </button>
+          </div>
+          <p id="weather-run" class="weather-run">Checking model run…</p>
+          <div class="weather-playback">
+            <button id="weather-play" aria-label="Play weather map timeline">
+              <span class="play-icon" aria-hidden="true"></span></button
+            ><label class="sr-only" for="weather-frame"
+              >Weather map valid time</label
+            ><input
+              id="weather-frame"
+              type="range"
+              min="0"
+              max="0"
+              value="0"
+              disabled
+            /><button
+              id="weather-map-info"
+              aria-label="Weather map legend and coverage"
+            >
+              i
+            </button>
+          </div>
+          <div class="weather-timeline-labels">
+            <span id="weather-start">—</span
+            ><span id="weather-end">+72 HOURS</span>
+          </div>
+          <div id="weather-legend" class="weather-legend"></div>
+          <p class="map-source" id="weather-source"></p>
         </div>
         <div class="radar-console" id="radar-console">
           <div class="radar-console-top">
@@ -437,6 +547,24 @@
             conditions.
           </p>
         </div>
+        <button class="sun-strip surface" data-detail="sun">
+          <span aria-hidden="true" class="sun-small"
+            ><svg
+              aria-hidden="true"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+              viewbox="0 0 24 24"
+            >
+              <path
+                d="M2 17h20M5 17a7 7 0 0 1 14 0M12 3v3M3 8l2 2m14 0 2-2"
+              ></path></svg></span
+          ><span><small>SUNSET</small><strong id="today-sunset">—</strong></span
+          ><span class="daylight-track"><i id="daylight-progress"></i></span
+          ><span class="sun-strip-end" id="daylight-label">Daylight</span>
+        </button>
         <div class="plan-inputs surface">
           <label for="activity"
             >Activity<select id="activity">
@@ -481,7 +609,7 @@
             <h2>TrueCast</h2>
             <p id="app-install-status">Your daily weather companion.</p>
           </div>
-          <span class="version-pill">3.1</span>
+          <span class="version-pill">4.0</span>
         </div>
         <div class="surface settings-group">
           <h3>Make it yours</h3>
@@ -536,8 +664,10 @@
             Forecast and air quality are model estimates. Radar shows
             observations where available; gaps in coverage are not clear skies.
             Official warning maps cover the US. Tropical tracking covers NHC
-            Atlantic and eastern/central Pacific products. Lightning detection
-            and minute-specific rain arrival are not available.
+            Atlantic and eastern/central Pacific products. Lightning density is
+            a regional observed grid, not individual strike tracking. Future
+            maps are model forecasts; minute-specific rain arrival is not
+            included.
           </p>
           <p class="fine">
             Weather requests send the selected coordinates to the providers.
@@ -564,6 +694,20 @@
               <a href="https://rainviewer.com/" rel="noopener" target="_blank"
                 >RainViewer</a
               >
+              · Future maps:
+              <a
+                href="https://www.dwd.de/EN/ourservices/geoservices/geodienste.html"
+                rel="noopener"
+                target="_blank"
+                >DWD</a
+              >
+              · Lightning density / satellite:
+              <a
+                href="https://nowcoast.noaa.gov/"
+                rel="noopener"
+                target="_blank"
+                >NOAA nowCOAST</a
+              >
               · US alerts:
               <a href="https://weather.gov/" rel="noopener" target="_blank"
                 >NWS</a
@@ -572,8 +716,9 @@
             <p class="fine">
               Personal, noncommercial edition. Saved places and preferences stay
               in this browser. Coordinates are sent to weather providers when
-              you request a forecast. Map tiles load from OpenStreetMap and
-              RainViewer when opened.
+              you request a forecast. Maps request imagery from OpenStreetMap,
+              RainViewer, DWD and NOAA when opened. Air and pollen requests use
+              CAMS via Open-Meteo.
             </p>
           </footer>
         </details>
@@ -683,7 +828,7 @@
         </button>
       </div>
       <label class="setting-row" for="radar-opacity"
-        ><span>Radar opacity <output id="opacity-value">75%</output></span
+        ><span>Layer opacity <output id="opacity-value">75%</output></span
         ><input
           id="radar-opacity"
           max="100"
@@ -706,9 +851,10 @@
         resolution stops at zoom 7. Zooming closer enlarges the same data.
       </p>
       <p class="fine">
-        Future radar and live lightning are not included. Official tropical
-        track cones represent center-track uncertainty, not the complete area of
-        storm impacts.
+        Future model maps and NOAA lightning density are available from Maps.
+        Density is not an individual lightning-strike location. Official
+        tropical track cones represent center-track uncertainty, not the
+        complete area of storm impacts.
       </p>
     </dialog>
     <noscript

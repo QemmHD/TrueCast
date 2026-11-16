@@ -87,29 +87,37 @@ export const condition = (code) =>
                     : code <= 86
                       ? "Snow showers"
                       : "Thunderstorms";
+let iconSequence = 0;
 export function weatherIcon(code, day = true) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 80 64");
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"),
+    id = `wx${++iconSequence}`;
+  svg.setAttribute("viewBox", "0 0 100 90");
   svg.setAttribute("aria-hidden", "true");
-  const sun =
-    '<circle cx="33" cy="27" r="13" fill="#ffd180"/><path d="M33 5v4m0 36v4M11 27h4m36 0h4M18 12l3 3m24 24 3 3M18 42l3-3m24-24 3-3" stroke="#eebd71" stroke-width="2" stroke-linecap="round"/>';
-  const moon =
-    '<path d="M42 6a22 22 0 1 0 19 33A22 22 0 0 1 42 6Z" fill="#dce6ff"/><circle cx="64" cy="12" r="1.7" fill="#dce6ff"/>';
-  const cloud =
-    '<path d="M19 48a11 11 0 0 1 0-22 17 17 0 0 1 32-4 13 13 0 0 1 5 26Z" fill="#a8bbd1"/><path d="M16 48h41" stroke="#d4e0ee" stroke-opacity=".4" stroke-width="2"/>';
-  let html = !Number.isFinite(code)
-    ? '<path d="M22 32h30" stroke="#a8bbd1" stroke-width="3"/>'
+  svg.innerHTML = `<defs>
+    <radialGradient id="${id}s" cx=".35" cy=".25" r=".8"><stop stop-color="#fff4ca"/><stop offset=".48" stop-color="#ffcd71"/><stop offset="1" stop-color="#df7739"/></radialGradient>
+    <linearGradient id="${id}c" x1=".25" y1="0" x2=".7" y2="1"><stop stop-color="#f8fbff"/><stop offset=".4" stop-color="#c0d3ec"/><stop offset="1" stop-color="#657a9f"/></linearGradient>
+    <linearGradient id="${id}m" x1="0" x2="1" y2="1"><stop stop-color="#f3f0ff"/><stop offset=".5" stop-color="#d2d5ff"/><stop offset="1" stop-color="#7c8bbf"/></linearGradient>
+    <filter id="${id}b" x="-.5" y="-.5" width="2" height="2"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>`;
+  const sun = `<circle cx="43" cy="35" r="28" fill="#ffbc58" opacity=".13" filter="url(#${id}b)"/><circle cx="43" cy="35" r="21" fill="url(#${id}s)"/><circle cx="43" cy="35" r="26" fill="none" stroke="#ffd792" stroke-opacity=".17"/><path d="M43 3v3m0 58v3M11 35h3m58 0h3M20 12l2 2m42 42 2 2M20 58l2-2m42-42 2-2" stroke="#ffce85" stroke-width="2" stroke-linecap="round"/>`;
+  const moon = `<path d="M56 12a29 29 0 1 0 23 44A30 30 0 0 1 56 12Z" fill="url(#${id}m)"/><path d="M54 15a27 27 0 1 0 23 41" fill="none" stroke="#e7e7ff" stroke-width=".7" opacity=".7"/><circle cx="81" cy="18" r="1.4" fill="#cfd7ff"/><circle cx="22" cy="13" r=".9" fill="#cfd7ff"/>`;
+  const cloud = `<path d="M24 67a15 15 0 0 1-1-30 22 22 0 0 1 41-7 19 19 0 1 1 6 37Z" fill="url(#${id}c)"/><path d="M25 39a20 20 0 0 1 37-7" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.2"/><path d="M26 64h43" stroke="#7792b7" stroke-opacity=".35" stroke-width="1.3" stroke-linecap="round"/>`;
+  let art = !Number.isFinite(code)
+    ? '<path d="M30 45h40" stroke="#98acc5" stroke-width="3"/>'
     : code < 3
       ? (day ? sun : moon) + (code > 0 ? cloud : "")
       : cloud;
-  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82))
-    html +=
-      '<path d="m25 53-3 7m14-7-3 7m14-7-3 7" stroke="#67cbff" stroke-width="3" stroke-linecap="round"/>';
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95)
+    art +=
+      '<path d="m32 74-3 7m17-7-3 7m17-7-3 7" stroke="#62d5fb" stroke-width="3" stroke-linecap="round"/>';
   if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86))
-    html +=
-      '<g fill="#def0ff"><circle cx="24" cy="57" r="2"/><circle cx="36" cy="59" r="2"/><circle cx="48" cy="55" r="2"/></g>';
+    art +=
+      '<g stroke="#def3ff" stroke-width="1.5"><path d="M31 73v10m-4-5h8m11-5v10m-4-5h8m11-5v10m-4-5h8"/></g>';
+  if (code >= 45 && code <= 48)
+    art +=
+      '<path d="M20 71h57M28 78h45" stroke="#c9d7ea" stroke-opacity=".65" stroke-width="3" stroke-linecap="round"/>';
   if (code >= 95)
-    html += '<path d="m38 44-8 12h8l-3 8 15-15h-9l4-5Z" fill="#ffd180"/>';
-  svg.innerHTML = html;
+    art += '<path d="m54 48-13 20h10l-5 17 21-25H56l6-12Z" fill="#ffcb69"/>';
+  svg.innerHTML += art;
   return svg;
 }

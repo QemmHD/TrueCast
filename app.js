@@ -1,3 +1,4 @@
+import { createEnvironment } from "./environment.js";
 import { $, store, node, json, condition, weatherIcon } from "./api.js";
 import { initUI, sheet } from "./ui.js";
 import { createRadar } from "./radar.js";
@@ -149,6 +150,12 @@ function render() {
   $("feels").textContent = temp(c.apparent_temperature);
   $("range").textContent =
     `H:${temp(d.temperature_2m_max[k])}  L:${temp(d.temperature_2m_min[k])}`;
+  document.querySelector('[data-forecast-view="daily"]').textContent =
+    `${d.time.length} days`;
+  $("hero-outlook-days").textContent = `${d.time.length} days`;
+  $("outlook-title").textContent = `Your next ${d.time.length} days.`;
+  $("outlook-summary").textContent =
+    `${day(d.time[0])} – ${day(d.time.at(-1))} · ${data.timezone.replaceAll("_", " ")}`;
   $("weather-art").replaceChildren(weatherIcon(c.weather_code, c.is_day === 1));
   $("today-rain").textContent = number(d.precipitation_probability_max[k], "%");
   $("rain-caption").textContent =
@@ -177,6 +184,7 @@ function render() {
       selected = i - begin;
       metric = "temperature";
       renderForecast();
+      document.querySelector('[data-forecast-view="hourly"]').click();
       location.hash = "forecast";
     };
     $("preview-hours").append(b);
@@ -206,6 +214,7 @@ function render() {
     }
   }
   $("change-brief").textContent = change;
+  $("forecast-story").textContent = change;
   const sunrise = d.sunrise[k],
     sunset = d.sunset[k],
     now = Date.now() / 1000;
@@ -613,9 +622,21 @@ function showDetail(type) {
           ? `${(data.hourly.visibility[start()] / (measurements === "imperial" ? 1609.344 : 1000)).toFixed(1)} ${measurements === "imperial" ? "mi" : "km"}`
           : "Unavailable",
       ],
+      ["Sunrise", time(d.sunrise[k])],
+      ["Sunset", time(d.sunset[k])],
       ["Source", "Open-Meteo · Model estimate"],
     ];
   content.append(facts(items));
+  if (type === "aqi") {
+    const button = node(
+      "button",
+      "Explore air & pollen forecast →",
+      "full-button",
+    );
+    button.id = "open-air-forecast";
+    button.onclick = () => environment.open();
+    content.append(button);
+  }
   content.append(
     node(
       "p",
@@ -916,7 +937,12 @@ function load(p, force = false) {
     p.longitude === place.longitude
   ) {
     return Promise.all(
-      Object.values(resources).map((r) => r.refresh({ force })),
+      Object.entries(resources).map(([name, r]) =>
+        r.refresh({
+          force:
+            force || (name === "forecast" && data?.daily?.time?.length < 16),
+        }),
+      ),
     );
   }
   const g = ++generation;
@@ -966,7 +992,7 @@ function load(p, force = false) {
       "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,snowfall_sum",
     timezone: "auto",
     timeformat: "unixtime",
-    forecast_days: 10,
+    forecast_days: 16,
   });
   add("forecast", {
     key: `truecast-forecast-v3-${id}`,
@@ -1026,7 +1052,13 @@ function load(p, force = false) {
       updateAlertBadge();
     },
   });
-  return Promise.all(Object.values(resources).map((r) => r.refresh({ force })));
+  return Promise.all(
+    Object.entries(resources).map(([name, r]) =>
+      r.refresh({
+        force: force || (name === "forecast" && data?.daily?.time?.length < 16),
+      }),
+    ),
+  );
 }
 function showFreshness() {
   detailType = "";
@@ -1072,13 +1104,39 @@ function showFreshness() {
       "fine",
     ),
   );
+  content.append(
+    node(
+      "p",
+      "Future map fields: DWD ICON 0.25°, using published valid times and model runs. Observed lightning density and infrared satellite: NOAA nowCOAST. These maps refresh independently; a forecast field is not observed radar, and density is not an individual strike location.",
+      "fine",
+    ),
+  );
   sheet("Sources & freshness", content, "DATA TRANSPARENCY");
 }
 const radar = createRadar({
   getPlace: () => place,
-  onSelect: (p) => {
-    load(p);
-    location.hash = "today";
+  getUnit: () => unit,
+  getMeasurements: () => measurements,
+  getTimezone: () =>
+    data?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+  onSelect: async (p, options = {}) => {
+    await load(p);
+    if (options.validTime && data) {
+      const validAt = options.validTime / 1000;
+      const available = data.hourly.time;
+      const closest = available.reduce(
+        (best, t, i) =>
+          Math.abs(t - validAt) < Math.abs(available[best] - validAt)
+            ? i
+            : best,
+        0,
+      );
+      $("horizon").value = "144";
+      selected = Math.max(0, closest - start());
+      renderForecast();
+      document.querySelector('[data-forecast-view="hourly"]').click();
+      location.hash = "forecast";
+    } else location.hash = "today";
   },
   showSheet: (title, content) => {
     detailType = "";
@@ -1086,6 +1144,13 @@ const radar = createRadar({
   },
 });
 $("refresh-weather").onclick = () => load(place, true);
+$("hero-outlook").onclick = () =>
+  document.querySelector('[data-forecast-view="daily"]').click();
+document.querySelector(".weather-brief").onclick = () =>
+  document.querySelector('[data-forecast-view="hourly"]').click();
+$("hero-future-map").onclick = () => {
+  window.dispatchEvent(new Event("truecast:future-map"));
+};
 $("save").onclick = () => {
   const i = saved.findIndex(
     (p) => p.latitude === place.latitude && p.longitude === place.longitude,
@@ -1223,6 +1288,13 @@ document.addEventListener("visibilitychange", () => {
   if (!document.hidden) wakeSources();
 });
 setInterval(tickSources, 15000);
+const environment = createEnvironment({
+  getPlace: () => place,
+  present: (title, content) => {
+    detailType = "";
+    sheet(title, content, "YOUR ENVIRONMENT");
+  },
+});
 const officialSources = sourceTools({
   getPlace: () => place,
   temp,

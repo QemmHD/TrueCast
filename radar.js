@@ -1,7 +1,15 @@
+import { createWeatherMaps } from "./weather-maps.js";
 import { $, json, node } from "./api.js";
 const NHC =
   "https://mapservices.weather.noaa.gov/tropical/rest/services/tropical/NHC_tropical_weather/MapServer";
-export function createRadar({ getPlace, onSelect, showSheet }) {
+export function createRadar({
+  getPlace,
+  onSelect,
+  showSheet,
+  getTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone,
+  getUnit = () => "F",
+  getMeasurements = () => "imperial",
+}) {
   let map,
     marker,
     radarLayer,
@@ -26,12 +34,25 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     radarRequest,
     radarFailed = false,
     warningFailed = false,
-    tropicalFailed = false;
+    tropicalFailed = false,
+    futureViewSet = false;
   let warningData,
     tropicalData,
     trackingFeatures = [],
     trackingItems = [];
   const status = (text) => ($("map-data-status").textContent = text);
+  const fieldLayer = (k) => ["forecast", "satellite", "lightning"].includes(k);
+  const weatherMaps = createWeatherMaps({
+    getMap: () => map,
+    getPlace,
+    getTimezone,
+    getUnit,
+    getMeasurements,
+    getOpacity: () => Number($("radar-opacity").value) / 100,
+    isActive: () => fieldLayer(kind) && document.body.dataset.screen === "map",
+    status,
+    showSheet,
+  });
   const shortTime = (t) =>
     new Date(t * 1000).toLocaleTimeString([], {
       hour: "numeric",
@@ -75,6 +96,7 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     L.control.attribution({ position: "bottomleft", prefix: false }).addTo(map);
     const p = getPlace();
     marker = L.circleMarker([p.latitude, p.longitude], {
+      pane: "markerPane",
       radius: 6,
       color: "#ecf7ff",
       weight: 2,
@@ -82,10 +104,11 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
       fillOpacity: 1,
     }).addTo(map);
     map.on("click", (e) => {
+      const point = e.latlng.wrap();
       pin = {
         name: "Map pin",
-        latitude: Number(e.latlng.lat.toFixed(4)),
-        longitude: Number(e.latlng.lng.toFixed(4)),
+        latitude: Number(point.lat.toFixed(4)),
+        longitude: Number(point.lng.toFixed(4)),
       };
       $("map-point-name").textContent =
         `${pin.latitude.toFixed(2)}°, ${pin.longitude.toFixed(2)}°`;
@@ -94,7 +117,9 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     });
     map.on("movestart", () => {
       if (playing) stop();
+      weatherMaps.stop();
     });
+    map.on("moveend resize", () => weatherMaps.requestView());
     return true;
   }
   function frameCaption(f) {
@@ -551,11 +576,13 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
         status("Source retry is delayed. Saved map data is unverified.");
         return;
       }
+      if (fieldLayer(kind)) return weatherMaps.activate(kind, { force: true });
       if (kind === "warnings") return loadWarnings(layerToken, true);
       if (kind === "tropical") return loadTropical(layerToken, true);
     }
+    weatherMaps.hide();
     kind = next;
-    ((retryAt = 0), radarRequest);
+    retryAt = 0;
     const token = ++layerToken;
     stop();
     ++frameToken;
@@ -577,6 +604,19 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
         n.setAttribute("aria-pressed", String(n.dataset.layer === kind)),
       );
     $("map-point").hidden = true;
+    $("radar-console").hidden = fieldLayer(kind);
+    $("weather-console").hidden = !fieldLayer(kind);
+    document.body.dataset.mapLayer = kind;
+    if (!init()) return;
+    if (fieldLayer(kind)) {
+      if (kind === "forecast" && !futureViewSet) {
+        futureViewSet = true;
+        if (map.getZoom() > 5) map.setZoom(5);
+      }
+      if (document.body.dataset.screen === "map")
+        await weatherMaps.activate(kind, { force });
+      return;
+    }
     $("radar-playback").hidden = kind !== "radar";
     $("tracking-summary").hidden = kind === "radar";
     $("radar-time-kind").textContent =
@@ -601,13 +641,9 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     $("tracking-text").textContent = "Loading official data…";
     $("tracking-list").disabled = true;
     $("tracking-fit").disabled = true;
-    if (!init()) return;
     if (kind === "radar") await fetchRadar(force);
-    else if (kind === "warnings") {
-      await loadWarnings(token, force);
-    } else {
-      await loadTropical(token, force);
-    }
+    else if (kind === "warnings") await loadWarnings(token, force);
+    else await loadTropical(token, force);
   }
   document
     .querySelectorAll("[data-layer]")
@@ -648,6 +684,11 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     const v = Number($("radar-opacity").value);
     $("opacity-value").textContent = `${v}%`;
     radarLayer?.setOpacity(v / 100);
+    weatherMaps.setOpacity(v / 100);
+    trackingLayer?.setStyle?.({
+      opacity: v / 100,
+      fillOpacity: (v / 100) * 0.2,
+    });
   };
   $("coverage").onchange = () => {
     if (kind === "radar" && coverageLayer)
@@ -665,7 +706,10 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     }
   };
   $("point-forecast").onclick = () => {
-    if (pin) onSelect(pin);
+    if (pin)
+      onSelect(pin, {
+        validTime: fieldLayer(kind) ? weatherMaps.selectedTime() : null,
+      });
     $("map-point").hidden = true;
   };
   $("tracking-fit").onclick = () => {
@@ -754,6 +798,7 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
   };
   async function refreshActive() {
     if (!document.hidden && document.body.dataset.screen === "map") {
+      if (fieldLayer(kind)) weatherMaps.updateLabels();
       if (kind === "radar" && current > 0)
         $("radar-age").textContent =
           `${Math.max(0, Math.round((Date.now() / 1000 - current) / 60))} min old`;
@@ -780,6 +825,10 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
       return;
     refreshBusy = true;
     try {
+      if (fieldLayer(kind)) {
+        await weatherMaps.refresh();
+        return;
+      }
       if (kind === "radar") {
         if (
           radarFailed ||
@@ -809,7 +858,8 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
   function enter() {
     if (!init()) return;
     requestAnimationFrame(() => map.invalidateSize());
-    void refreshActive();
+    if (fieldLayer(kind)) void weatherMaps.activate(kind);
+    else void refreshActive();
   }
   setInterval(refreshActive, 30000);
   addEventListener("online", () => {
@@ -817,11 +867,17 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
   });
   addEventListener("truecast:route", (e) => {
     if (e.detail.route === "map") enter();
-    else stop();
+    else {
+      stop();
+      weatherMaps.stop();
+    }
   });
+  addEventListener("truecast:future-map", () => selectLayer("forecast"));
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) stop();
-    else if (document.body.dataset.screen === "map") enter();
+    if (document.hidden) {
+      stop();
+      weatherMaps.stop();
+    } else if (document.body.dataset.screen === "map") enter();
   });
   return {
     enter,
@@ -829,7 +885,10 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
       if (map) {
         const p = getPlace();
         marker.setLatLng([p.latitude, p.longitude]);
-        map.setView([p.latitude, p.longitude], 7);
+        map.setView(
+          [p.latitude, p.longitude],
+          fieldLayer(kind) ? Math.min(map.getZoom(), 5) : 7,
+        );
       }
     },
   };

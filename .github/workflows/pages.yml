@@ -22,8 +22,11 @@ jobs:
       - name: Prepare public app
         run: |
           mkdir -p _site
-          cp index.html style.css app.js api.js refresh.js forecast-time.js sources.js radar.js ui.js install.js sw.js manifest.webmanifest .nojekyll _site/
+          cp index.html style.css atmosphere.css app.js api.js refresh.js forecast-time.js sources.js weather-maps.js environment.js radar.js ui.js install.js sw.js manifest.webmanifest .nojekyll _site/
           cp -r icons _site/icons
+          cp -r vendor _site/vendor
+      - name: Version the complete app shell
+        run: python3 scripts/stamp-shell.py _site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
