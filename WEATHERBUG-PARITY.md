@@ -1,3 +1,5 @@
+> Release update: TrueCast 3.0 adds official NHC regional tracks/cones, official US warning geometry/affected-zone lookup, model comparison and the redesigned dark interface. See README.md for the current feature list; unimplemented/parity labels below describe the earlier roadmap unless explicitly updated.
+
 # TrueCast's WeatherBug replacement target
 
 Updated 16 November 2026. This supplements PLAN.md and supersedes its original 7-day/24-hour starter baseline. WeatherBug feature parity is now a product requirement, not a statement that the existing starter already meets it. Free-to-start remains the budget constraint.

@@ -1,3 +1,5 @@
+> Current release: TrueCast 3.0 is implemented and deployed through the existing Pages workflow. README.md and COMPETITOR-RESEARCH.md describe current behavior; this original plan remains as historical research and roadmap context.
+
 # TrueCast: build a weather observatory
 
 **Scope update:** WeatherBug is now the feature baseline. The user confirmed all tracker categories: rain arrival/movement, storms/nearby lightning, and hurricanes/severe weather. Plan worldwide coverage with explicit regional limitations. See [WEATHERBUG-PARITY.md](WEATHERBUG-PARITY.md) for the researched parity contract and tracker design. The starter now offers 10 daily days and 24/72/144-hour selection; descriptions of its original 7-day/24-hour baseline below are historical. Full parity is not yet implemented.

@@ -1,44 +1,119 @@
-const byId = id => document.getElementById(id);
-const routes = {today:['Today','YOUR LOCAL OUTLOOK'], forecast:['Forecast','A LITTLE PERSPECTIVE'], map:['Weather map','WATCH THE ATMOSPHERE'], plan:['Go outside','MAKE TIME FOR YOURSELF'], settings:['Settings','MAKE YOURSELF AT HOME']};
-const positions = {};
-let activeRoute;
-function navigate(focus = false) {
-  const requested = location.hash.slice(1), aliases = {radar:'map', outside:'plan'};
-  const route = aliases[requested] || (routes[requested] ? requested : 'today');
-  if (activeRoute) positions[activeRoute] = window.scrollY;
-  document.querySelectorAll('.app-screen[data-screen]').forEach(screen => { screen.hidden = screen.dataset.screen !== route; });
-  document.querySelectorAll('[data-nav]').forEach(link => {
-    if (link.dataset.nav === route) link.setAttribute('aria-current', 'page');
-    else link.removeAttribute('aria-current');
+import { $ } from "./api.js";
+const routes = {
+  today: "Today",
+  forecast: "Forecast",
+  map: "Radar",
+  plan: "Plan",
+  settings: "More",
+};
+let route,
+  positions = {};
+export function sheet(title, content, kicker = "WEATHER DETAILS") {
+  $("detail-title").textContent = title;
+  $("detail-kicker").textContent = kicker;
+  $("detail-content").replaceChildren(content);
+  if (!$("detail-dialog").open) $("detail-dialog").showModal();
+}
+export function initUI() {
+  function navigate(focus = false) {
+    const key = location.hash.slice(1),
+      aliases = { radar: "map", outside: "plan" };
+    const next = aliases[key] || (routes[key] ? key : "today");
+    if (route) positions[route] = $("main").scrollTop;
+    document
+      .querySelectorAll(".app-screen")
+      .forEach((n) => (n.hidden = n.dataset.screen !== next));
+    document
+      .querySelectorAll("[data-nav]")
+      .forEach((n) =>
+        n.dataset.nav === next
+          ? n.setAttribute("aria-current", "page")
+          : n.removeAttribute("aria-current"),
+      );
+    document.body.dataset.screen = next;
+    $("screen-title").textContent = routes[next];
+    document.title = `${routes[next]} · TrueCast`;
+    route = next;
+    $("main").scrollTop = positions[next] || 0;
+    if (focus) $("screen-title").focus({ preventScroll: true });
+    window.dispatchEvent(
+      new CustomEvent("truecast:route", { detail: { route: next } }),
+    );
+  }
+  addEventListener("hashchange", () => navigate(true));
+  navigate();
+  for (const [dialog, close] of [
+    ["places-dialog", "close-places"],
+    ["detail-dialog", "close-detail"],
+    ["map-dialog", "close-map-dialog"],
+  ]) {
+    $(close).onclick = () => $(dialog).close();
+    $(dialog).addEventListener("click", (e) => {
+      if (e.target === $(dialog)) {
+        const r = e.target.getBoundingClientRect();
+        if (
+          e.clientX < r.left ||
+          e.clientX > r.right ||
+          e.clientY < r.top ||
+          e.clientY > r.bottom
+        )
+          e.target.close();
+      }
+    });
+  }
+  $("open-places").onclick = () => {
+    $("places-dialog").showModal();
+    $("city").focus();
+  };
+  addEventListener("truecast:place", (e) => {
+    $("header-place").textContent = e.detail.name;
+    if ($("places-dialog").open) $("places-dialog").close();
   });
-  byId('screen-title').textContent = routes[route][0];
-  byId('screen-kicker').textContent = routes[route][1];
-  document.title = `${routes[route][0]} · TrueCast`;
-  document.body.dataset.screen = route;
-  activeRoute = route;
-  window.scrollTo({top:positions[route] || 0, behavior:'instant'});
-  if (focus) byId('screen-title').focus({preventScroll:true});
-  window.dispatchEvent(new CustomEvent('truecast:route', {detail:{route}}));
+  const theme = $("theme");
+  try {
+    if (localStorage.getItem("truecast-design-release") !== "3") {
+      localStorage.setItem("truecast-theme", "dark");
+      localStorage.setItem("truecast-design-release", "3");
+    }
+    theme.value = localStorage.getItem("truecast-theme") || "dark";
+  } catch {
+    theme.value = "dark";
+  }
+  function apply() {
+    document.documentElement.dataset.theme = theme.value;
+    const dark =
+      theme.value === "dark" ||
+      (theme.value === "system" &&
+        matchMedia("(prefers-color-scheme: dark)").matches);
+    document.querySelector("meta[name=theme-color]").content = dark
+      ? "#080e1a"
+      : "#eef2f8";
+  }
+  theme.onchange = () => {
+    try {
+      localStorage.setItem("truecast-theme", theme.value);
+    } catch {}
+    apply();
+  };
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", apply);
+  apply();
+  function network() {
+    $("connection-state").textContent = navigator.onLine ? "Online" : "Offline";
+    $("offline-banner").hidden = navigator.onLine;
+    document.body.dataset.offline = String(!navigator.onLine);
+  }
+  addEventListener("online", network);
+  addEventListener("offline", network);
+  network();
+  document.querySelectorAll("[data-forecast-view]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        const hourly = b.dataset.forecastView === "hourly";
+        $("hourly-view").hidden = !hourly;
+        $("daily-view").hidden = hourly;
+        document
+          .querySelectorAll("[data-forecast-view]")
+          .forEach((n) => n.setAttribute("aria-pressed", String(n === b)));
+      }),
+  );
 }
-window.addEventListener('hashchange', () => navigate(true));
-navigate();
-const places = byId('places-dialog');
-byId('open-places').addEventListener('click', () => { places.showModal(); byId('city').focus(); });
-byId('close-places').addEventListener('click', () => places.close());
-places.addEventListener('click', event => { if (event.target === places) places.close(); });
-window.addEventListener('truecast:place', event => { byId('header-place').textContent = event.detail.name; if (places.open) places.close(); });
-byId('open-warnings').addEventListener('click', () => { byId('alerts').open = true; });
-const theme = byId('theme');
-try { theme.value = localStorage.getItem('truecast-theme') || 'system'; } catch {}
-function applyTheme() {
-  document.documentElement.dataset.theme = theme.value;
-  const dark = theme.value === 'dark' || (theme.value === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-  document.querySelector('meta[name=theme-color]').content = dark ? '#101b1c' : '#f3f2ec';
-}
-theme.addEventListener('change', () => { try { localStorage.setItem('truecast-theme', theme.value); } catch {} applyTheme(); });
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
-applyTheme();
-function connection() { byId('offline-banner').hidden = navigator.onLine; byId('connection-state').textContent = navigator.onLine ? 'Online' : 'Offline'; }
-window.addEventListener('online', connection);
-window.addEventListener('offline', connection);
-connection();

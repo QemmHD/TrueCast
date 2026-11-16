@@ -2,12 +2,12 @@
   "id": "./",
   "name": "TrueCast Weather",
   "short_name": "TrueCast",
-  "description": "Your personal weather observatory: forecasts, radar and better windows for getting outside.",
+  "description": "TrueCast: local forecasts, observed radar, official warnings and tropical tracking.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f3f2ec",
-  "theme_color": "#142b30",
+  "background_color": "#080e1a",
+  "theme_color": "#080e1a",
   "lang": "en",
   "icons": [
     {
@@ -37,8 +37,5 @@
       "url": "./#map"
     }
   ],
-  "categories": [
-    "weather",
-    "utilities"
-  ]
+  "categories": ["weather", "utilities"]
 }

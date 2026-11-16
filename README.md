@@ -1,58 +1,44 @@
-# TrueCast
+# TrueCast 3.0
 
-A static weather observatory for GitHub Pages. No build step, API keys, or backend required for this personal, noncommercial edition.
+An installable, dark weather app served from GitHub Pages. No production build step or API keys are required for this personal, noncommercial edition.
 
-## Run locally
+**Live:** https://qemmhd.github.io/TrueCast/
+**Repository:** https://github.com/QemmHD/TrueCast
 
-From this folder: `python -m http.server 8000`, then open http://localhost:8000.
+## In this release
 
-## Publish to your repository
+- Compact Today screen, next-change summary, 12-hour preview and weather detail sheets.
+- Fahrenheit and dark appearance by default; persistent temperature, measurement and theme preferences.
+- 10-day and 144-hour forecasts, temperature/rain/wind charts, scrubbing and daily details.
+- Same-hour ECMWF IFS / GFS / ICON comparison on demand for the next 72 hours. This shows model disagreement; it does not establish a universal accuracy winner.
+- Full-screen observed radar with loaded-frame swapping, timestamps/age, playback speed, history length, opacity, coverage mask, zoom and map-point forecasts.
+- Official US warnings, polygon rendering, readable alert lists and selected affected-zone lookup for alerts without polygons.
+- Official NHC tropical forecast points, tracks and cones for its Atlantic/eastern/central Pacific products.
+- Daylight progress, UV, AQI/pollutants, humidity, dew point, gusts, pressure and visibility.
+- Outdoor planning with activity, duration and multiple non-overlapping windows across 72 hours.
+- Search, optional device location, saved places, cross-platform installation guidance and a cached app shell.
+- Safe-area spacing for iPhone notches/Dynamic Island and the Home indicator, including landscape layouts. This is a web app, not a native Dynamic Island Live Activity.
 
-Copy this folder's contents (including `.github` and `.nojekyll`) into your repository. In Settings → Pages, choose **GitHub Actions** as the source. Push to `main` or run the workflow manually. If your branch has another name, update `.github/workflows/pages.yml`.
+## Install
 
-All application paths are relative, so both `username.github.io/TrueCast/` and a custom domain work. Alternatively, select Deploy from a branch → main → / (root) in Pages settings to publish without the workflow.
+On iPhone/iPad: open the live site in Safari → Share → Add to Home Screen → Add. Keep Open as Web App enabled if shown. On supported Android/desktop browsers, choose Install TrueCast in More or use the browser's installation menu. Other browsers can use it as a website. No App Store or Google Play listing is included.
 
-## Included
+The existing installation receives web updates. Reopen while online, or use More → Check for updates. After an online visit, the app shell and a forecast no more than 24 hours old can open offline with a saved-data label. Fresh maps, searches, alerts and environmental data still need a connection.
 
-- Live 10-day and up to 144-hour forecasts, city search, explicit opt-in location lookup, saved places, Celsius/Fahrenheit.
-- A daylight activity window with transparent rain, wind and temperature thresholds.
-- On-demand interactive map, past radar animation, coverage mask and click-to-forecast.
-- US AQI estimates, UV maximum, sunrise/sunset, humidity, dew point, gusts, pressure and visibility.
-- NWS alerts for searched US locations. GPS/map pins check NWS point coverage first; unsupported locations and failed checks remain explicit.
-- Ten-minute browser forecast cache with dated stale fallback and independent provider failure states.
-- Responsive layout, keyboard controls, screen-reader status, reduced-motion support.
+## Local development and review
 
-## Limits
+Run `python3 -m http.server 8766` in this folder and open http://127.0.0.1:8766/.
 
-This starter does not implement the entire roadmap. Read PLAN.md for researched API choices, design specifications, premium roadmap and release gates. This release uses Leaflet, not the planned MapLibre renderer. It has no account sync, push service, future radar, lightning, pollen, ensemble bands, or true minute-level rain prediction. The horizon is decorative, not an astronomical chart. Temperature and metric/US measurement preferences are available in Settings.
+For browser review: `npm ci`, `npx playwright install chromium`, then `npm test` while the server is running. `TRUECAST_URL` overrides the test target; `TRUECAST_BROWSER_PATH` optionally selects a browser executable. Tests include live weather/radar checks and clearly separated synthetic warning/cyclone fixtures for states absent in the live feed. Synthetic data is never included in the published app.
 
-Open-Meteo's hosted free tier is noncommercial. RainViewer's public service targets personal, educational and small community projects. Keep attribution visible. OpenStreetMap public tiles must follow their usage policy (https://operations.osmfoundation.org/policies/tiles/): no offline tile downloading or prefetching, visible attribution and cache headers respected. Use a suitable basemap provider as traffic grows.
+The deployment workflow uploads only app files and icons to Pages; development tools, research and tests remain in the repository. Relative assets and hash routes support the `/TrueCast/` repository subpath.
 
-Forecast values and air quality are model estimates. A failed alert request must never be presented as “no alerts.” Cached forecasts can be old; their retrieval date remains visible. No background severe-weather notification delivery is provided.
+## Data and limits
 
-Third-party assets: Leaflet from unpkg, optional fonts from Google Fonts, map tiles from OpenStreetMap and RainViewer. All need network access. Saved places and preferences remain in localStorage; providers receive requested coordinates. No analytics are included.
+Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: RainViewer. Warnings and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See COMPETITOR-RESEARCH.md for the primary-source comparison and REVIEW.md for validation.
 
-## Validation
+Open-Meteo's hosted free tier is noncommercial; queries are weighted by variables/models and have rate limits. RainViewer's public service targets personal/educational/small community use. OpenStreetMap public tiles require normal browser caching, visible attribution and no bulk/offline tile downloading. An expanding commercial product needs suitable provider licensing and hosting.
 
-See validation notes in PLAN.md. Before public release, verify API CORS behavior from the actual Pages origin, provider terms, local-time behavior, radar coverage, keyboard/mobile rendering and provider outages.
+There is no licensed lightning detection, minute-specific rain nowcast, raw Doppler/velocity product, global tropical feed, native widgets or background push service. Surface wind is not storm-cell motion. Model point forecasts do not paint global forecast fields. No forecast superiority claim is made without regional measurement. National warnings remain authoritative; map coverage gaps, failed sources and incomplete geometry must not be shown as safe conditions.
 
-WeatherBug parity is now the product target. See WEATHERBUG-PARITY.md for researched feature coverage and dependencies. It is a roadmap, not a claim that the starter replaces all WeatherBug features.
-
-
-## iPhone Home Screen installation
-
-Open the published site in Safari → Share → Add to Home Screen → Add. Keep “Open as Web App” enabled if that option appears. The app has a standalone manifest, Apple touch icon, safe-area support, touch-sized controls and an in-app installation guide. No App Store download or account is needed.
-
-After the first successful online visit, the app shell is cached. A saved forecast up to 24 hours old can be shown with its retrieval timestamp when offline; search, fresh alerts and radar still need a connection. Third-party fonts/map libraries are not cached, and map tiles are never bulk-downloaded. Background notifications and native widgets are not implemented.
-
-Repository: https://github.com/QemmHD/TrueCast
-Expected Pages address after activation: https://qemmhd.github.io/TrueCast/
-
-
-## App interface
-
-TrueCast now uses five hash-based screens: Today, Forecast, Map, Plan and Settings. Phones have a fixed bottom navigation bar with safe-area support; tablets and desktop have a navigation rail. Hash routes work on GitHub Pages without server rewrites. A location dialog provides search, optional geolocation and saved-place management.
-
-Settings include light/dark/system appearance, Celsius/Fahrenheit, metric/US measurements, cross-platform installation help and an update check. Android/desktop browsers supporting `beforeinstallprompt` can offer a native installation prompt; iPhone/iPad use Safari's Add to Home Screen. Unsupported browsers retain website access. No App Store or Google Play listing has been submitted.
-
-Forecast includes a data-backed temperature chart and expandable daily details. The map has opacity and recenter controls and pauses playback when leaving the screen. Foreground weather is refreshed on request, reconnection or return after the cache expires; background monitoring is not provided.
+Saved locations/preferences remain on this device. Selected coordinates go to the requested weather providers; map tiles go to OpenStreetMap/RainViewer. No analytics, user account or API secrets are included. See the in-app coverage/privacy section for details.
