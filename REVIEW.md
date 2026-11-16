@@ -1,3 +1,20 @@
+# TrueCast 3.1 refresh and source review
+
+16 November 2026. This section describes the current release; the 3.0 review below remains historical context.
+
+- Ten deterministic unit scenarios: immediate cached data, coalesced requests, invalid responses, failure/Retry-After retention, offline expiry, hidden polling, cancellation/late responses, delayed model timestamps, HTTP expiry, epoch selection repeated DST hours, and HTTP Retry-After/cache-header/cancellation handling.
+- Browser refresh scenarios: slow same-place refresh keeps current conditions and all ten daily entries visible; selected absolute hour and horizontal scroll survive; an unfinished location search stays open. Bad payloads preserve good data and manual retries obey cooldowns.
+- Simulated phone suspension: hidden pages issue no source polls over ten minutes; return rechecks forecast/AQ/alerts independently. The selected future hour remains the same epoch.
+- Alert failure scenarios: non-expired warnings stay visible as unverified, a failed request never means no alerts, and an already open warning sheet removes expired records. Offline weather retains explicit saved labels.
+- Official-source fixtures: independent NWS narrative, correct Fahrenheit display, nearest recent verified station temperature, m/s to mph conversion, and rejection of old or unverified stations. Station readings never replace the main model conditions.
+- Location race: switch cities during a slow request; a late response for the old city cannot populate the new city's header/weather.
+- Real service-worker lifecycle across three local versions: complete 14-file cache; update waits without interrupting a search; next-start activation; manual activation; old-cache cleanup; offline reopen. This uses actual browser worker registration and activation, rather than mocking worker methods.
+- Existing live browser review continues to cover real weather/model/radar endpoints, forecast/planner/saved locations, synthetic warning geometry and NHC tracks/cones, source failures, five viewport sizes, Fahrenheit/theme persistence, installation help and cached-shell offline behavior.
+
+Tests use Chromium with an iPhone viewport/profile and simulated safe areas. They do not certify physical iPhone/Safari behavior, native background execution or forecast superiority. Research and timestamp semantics are documented in [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md).
+
+---
+
 # TrueCast 3.0 review
 
 16 November 2026. This is the review record for the dark weather-app release. Reproducible browser checks are in `tests/review.cjs`; competitor sources and applied findings are in `COMPETITOR-RESEARCH.md`.

@@ -1,4 +1,6 @@
-> Current release: TrueCast 3.0 is implemented and deployed through the existing Pages workflow. README.md and COMPETITOR-RESEARCH.md describe current behavior; this original plan remains as historical research and roadmap context.
+> Provider/refresh update: [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) contains current 3.1 findings, including Xweather/Foreca free allowances, Google experimental minute-forecast restrictions and iPhone background limits. This original document is historical planning context.
+
+> Current release: TrueCast 3.1 is implemented and deployed through the existing Pages workflow. README.md and COMPETITOR-RESEARCH.md describe current behavior; this original plan remains as historical research and roadmap context.
 
 # TrueCast: build a weather observatory
 

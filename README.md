@@ -1,4 +1,4 @@
-# TrueCast 3.0
+# TrueCast 3.1
 
 An installable, dark weather app served from GitHub Pages. No production build step or API keys are required for this personal, noncommercial edition.
 
@@ -6,6 +6,10 @@ An installable, dark weather app served from GitHub Pages. No production build s
 **Repository:** https://github.com/QemmHD/TrueCast
 
 ## In this release
+
+- Quiet, independent source refreshes with visible checked/valid times, offline recovery, cancellation and rate-limit backoff. Updates preserve the selected forecast hour, scroll, open sheets, searches and map position.
+- Sources & freshness panel, official NWS forecast narratives and nearby US station observations with temperature QC/age/distance checks. Station readings remain separate from model forecasts.
+- Complete versioned app-shell updates: download first, apply on the next startup or from More without interrupting an active search.
 
 - Compact Today screen, next-change summary, 12-hour preview and weather detail sheets.
 - Fahrenheit and dark appearance by default; persistent temperature, measurement and theme preferences.
@@ -23,19 +27,21 @@ An installable, dark weather app served from GitHub Pages. No production build s
 
 On iPhone/iPad: open the live site in Safari → Share → Add to Home Screen → Add. Keep Open as Web App enabled if shown. On supported Android/desktop browsers, choose Install TrueCast in More or use the browser's installation menu. Other browsers can use it as a website. No App Store or Google Play listing is included.
 
-The existing installation receives web updates. Reopen while online, or use More → Check for updates. After an online visit, the app shell and a forecast no more than 24 hours old can open offline with a saved-data label. Fresh maps, searches, alerts and environmental data still need a connection.
+The existing installation receives web updates. Reopen while online, or use More → Check for updates. A complete downloaded update applies on the next startup; it does not reload an active session automatically. The app shell, a forecast no more than 24 hours old and air quality no more than one hour old can reopen offline with saved-data labels. Fresh maps, searches and verified alerts need a connection.
+
+Weather checks run while the app is visible: forecast every 10 minutes, air quality every 15, local US alerts every 1–2. Returning to the app rechecks aged sources and reconnecting requests fresh data. iPhone can suspend closed/background web apps; scheduled silent closed-app refresh and continuous storm monitoring are not promised.
 
 ## Local development and review
 
 Run `python3 -m http.server 8766` in this folder and open http://127.0.0.1:8766/.
 
-For browser review: `npm ci`, `npx playwright install chromium`, then `npm test` while the server is running. `TRUECAST_URL` overrides the test target; `TRUECAST_BROWSER_PATH` optionally selects a browser executable. Tests include live weather/radar checks and clearly separated synthetic warning/cyclone fixtures for states absent in the live feed. Synthetic data is never included in the published app.
+For browser review: `npm ci`, `npx playwright install chromium`, then `npm test` while the server is running. `TRUECAST_URL` overrides the test target; `TRUECAST_BROWSER_PATH` optionally selects a browser executable. Tests include deterministic freshness/clock/DST and refresh-flow checks, actual service-worker upgrade/offline tests, live weather/radar checks and clearly separated synthetic warning/cyclone fixtures for states absent in the live feed. Synthetic data is never included in the published app.
 
 The deployment workflow uploads only app files and icons to Pages; development tools, research and tests remain in the repository. Relative assets and hash routes support the `/TrueCast/` repository subpath.
 
 ## Data and limits
 
-Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: RainViewer. Warnings and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See COMPETITOR-RESEARCH.md for the primary-source comparison and REVIEW.md for validation.
+Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: RainViewer. Warnings, independent official forecast/observations and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) for the expanded provider/refresh review, [COMPETITOR-RESEARCH.md](COMPETITOR-RESEARCH.md) for app comparisons and [REVIEW.md](REVIEW.md) for validation.
 
 Open-Meteo's hosted free tier is noncommercial; queries are weighted by variables/models and have rate limits. RainViewer's public service targets personal/educational/small community use. OpenStreetMap public tiles require normal browser caching, visible attribution and no bulk/offline tile downloading. An expanding commercial product needs suitable provider licensing and hosting.
 

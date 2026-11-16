@@ -1,11 +1,14 @@
 // Cache only the app shell. Forecast APIs and map tiles retain normal network behavior.
-const CACHE = "truecast-shell-v3";
+const CACHE = "truecast-shell-v3.1";
 const ROOT = new URL("./", self.location.href);
 const SHELL = [
   "index.html",
   "style.css",
   "app.js",
   "api.js",
+  "refresh.js",
+  "forecast-time.js",
+  "sources.js",
   "radar.js",
   "ui.js",
   "install.js",
@@ -19,9 +22,18 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll([...shellURLs]))
-      .then(() => self.skipWaiting()),
+      .then((cache) =>
+        cache.addAll(
+          [...shellURLs].map((url) => new Request(url, { cache: "reload" })),
+        ),
+      )
+      .then(() => {
+        if (!self.registration.active) return self.skipWaiting();
+      }),
   );
+});
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "ACTIVATE_UPDATE") self.skipWaiting();
 });
 self.addEventListener("activate", (event) => {
   event.waitUntil(
@@ -50,6 +62,8 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
+      const saved = await cache.match(key);
+      if (saved) return saved;
       try {
         const response = await fetch(event.request, { cache: "no-cache" });
         if (response.ok) {

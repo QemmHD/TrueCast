@@ -20,7 +20,13 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     speed = 1,
     lastRadarFetch = 0,
     layerToken = 0,
-    pin;
+    pin,
+    refreshBusy = false,
+    retryAt = 0,
+    radarRequest,
+    radarFailed = false,
+    warningFailed = false,
+    tropicalFailed = false;
   let warningData,
     tropicalData,
     trackingFeatures = [],
@@ -95,7 +101,11 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     $("radar-time").textContent = `${shortTime(f.time)} local`;
     $("radar-age").textContent =
       `${Math.max(0, Math.round((Date.now() / 1000 - f.time) / 60))} min old`;
-    $("map-data-status").textContent = "Past radar · not a future forecast";
+    $("map-data-status").textContent = !navigator.onLine
+      ? "Offline · displayed frame is saved"
+      : radarFailed
+        ? "Radar check failed · displayed frame is saved"
+        : "Past radar · not a future forecast";
   }
   async function showFrame(index) {
     if (kind !== "radar" || !frames.length || !map) return false;
@@ -168,11 +178,27 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     $("frame").disabled = !frames.length;
     $("play").disabled = !frames.length;
   }
-  async function fetchRadar(force = false) {
-    if (!init()) return;
+  function fetchRadar(force = false, preserve = false) {
+    if (radarRequest) return radarRequest;
+    radarRequest = retrieveRadar(force, preserve).finally(() => {
+      radarRequest = null;
+    });
+    return radarRequest;
+  }
+  async function retrieveRadar(force = false, preserve = false) {
+    if (!init() || !navigator.onLine || Date.now() < retryAt) return;
+    const previous = current,
+      followLatest = current === allFrames.at(-1)?.time;
     if (!force && Date.now() - lastRadarFetch < 300000 && allFrames.length) {
       history();
-      await showFrame(frames.length - 1);
+      await showFrame(
+        preserve && !followLatest
+          ? Math.max(
+              0,
+              frames.findIndex((f) => f.time === previous),
+            )
+          : frames.length - 1,
+      );
       return;
     }
     const requestedLayer = layerToken;
@@ -197,7 +223,9 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
           f.time <= Date.now() / 1000 + 60,
       );
       if (!allFrames.length) throw new Error("No valid frames");
+      radarFailed = false;
       lastRadarFetch = Date.now();
+      ((retryAt = 0), radarRequest);
       history();
       remove(coverageLayer);
       coverageLayer = L.tileLayer(
@@ -205,10 +233,23 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
         { pane: "weather", maxNativeZoom: 7, maxZoom: 14, opacity: 0.6 },
       );
       if ($("coverage").checked && kind === "radar") coverageLayer.addTo(map);
-      await showFrame(frames.length - 1);
-    } catch {
+      await showFrame(
+        preserve && !followLatest
+          ? Math.max(
+              0,
+              frames.findIndex((f) => f.time === previous),
+            )
+          : frames.length - 1,
+      );
+    } catch (error) {
       if (kind !== "radar" || requestedLayer !== layerToken) return;
-      status("Radar unavailable. Tap Latest to retry.");
+      radarFailed = true;
+      retryAt = Math.max(Date.now() + 60000, error.retryAt || 0);
+      status(
+        radarLayer
+          ? "Radar check failed · displayed frame is saved"
+          : "Radar unavailable. Tap Latest to retry.",
+      );
       if (!radarLayer) $("radar-time").textContent = "No observed frame loaded";
     } finally {
       $("radar-latest").disabled = false;
@@ -300,21 +341,25 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     return d;
   }
 
-  async function loadWarnings(token) {
+  async function loadWarnings(token, force = false) {
     status("Loading official US warnings…");
     try {
-      if (!warningData || Date.now() - warningData.at > 300000) {
+      if (force || !warningData || Date.now() - warningData.at > 120000) {
         const r = await json(
           "https://api.weather.gov/alerts/active?status=actual",
           25000,
         );
         if (!Array.isArray(r.features)) throw new Error("Invalid alerts");
         warningData = { at: Date.now(), features: r.features };
+        warningFailed = false;
       }
       if (token !== layerToken || kind !== "warnings") return;
-      trackingFeatures = warningData.features;
+      trackingFeatures = warningData.features.filter(
+        (f) => Date.parse(f.properties?.expires) > Date.now(),
+      );
       trackingItems = trackingFeatures;
       const geometries = trackingFeatures.filter((f) => f.geometry);
+      const previousLayer = trackingLayer;
       trackingLayer = L.geoJSON(geometries, {
         pane: "hazards",
         style: (f) => ({
@@ -331,6 +376,7 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
           });
         },
       }).addTo(map);
+      remove(previousLayer);
       $("tracking-text").textContent =
         `${trackingFeatures.length} active US alerts. ${trackingFeatures.length - geometries.length} have no polygon and appear in the list only.`;
       $("radar-time").textContent =
@@ -341,7 +387,13 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
       $("tracking-fit").disabled = !geometries.length;
     } catch {
       if (token !== layerToken) return;
-      status("Official warning data unavailable. Try refresh.");
+      warningFailed = true;
+      retryAt = Date.now() + 60000;
+      status(
+        trackingLayer
+          ? "Warning check failed · saved overlay is unverified"
+          : "Official warning data unavailable. Try refresh.",
+      );
       $("tracking-text").textContent =
         "Alerts could not be checked. This is not an all-clear.";
       $("radar-time").textContent = "Warning source unavailable";
@@ -367,10 +419,10 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     return results;
   }
 
-  async function loadTropical(token) {
+  async function loadTropical(token, force = false) {
     status("Loading official tropical forecasts…");
     try {
-      if (!tropicalData || Date.now() - tropicalData.at > 600000) {
+      if (force || !tropicalData || Date.now() - tropicalData.at > 600000) {
         const meta = await json(`${NHC}?f=json`);
         const layers = meta.layers.filter((l) =>
           /Forecast Points$/.test(l.name),
@@ -427,6 +479,7 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
           return s;
         });
         tropicalData = { at: Date.now(), systems, missing };
+        tropicalFailed = false;
       }
       if (token !== layerToken || kind !== "tropical") return;
       trackingItems = tropicalData.systems;
@@ -466,7 +519,9 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
         }).addTo(group);
         trackingFeatures.push(...s.points);
       }
+      const previousLayer = trackingLayer;
       trackingLayer = group.addTo(map);
+      remove(previousLayer);
       const n = trackingItems.length;
       $("radar-time").textContent =
         `${n} NHC forecast system${n === 1 ? "" : "s"}`;
@@ -478,14 +533,29 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
       $("tracking-fit").disabled = !n;
     } catch {
       if (token !== layerToken) return;
-      status("Tropical data unavailable. Try refresh.");
+      tropicalFailed = true;
+      retryAt = Date.now() + 60000;
+      status(
+        trackingLayer
+          ? "Tropical check failed · saved overlay is unverified"
+          : "Tropical data unavailable. Try refresh.",
+      );
       $("radar-time").textContent = "Tropical source unavailable";
       $("tracking-text").textContent =
         "Active systems could not be checked. Consult nhc.noaa.gov.";
     }
   }
   async function selectLayer(next, force = false) {
+    if (force && next === kind && map) {
+      if (Date.now() < retryAt) {
+        status("Source retry is delayed. Saved map data is unverified.");
+        return;
+      }
+      if (kind === "warnings") return loadWarnings(layerToken, true);
+      if (kind === "tropical") return loadTropical(layerToken, true);
+    }
     kind = next;
+    ((retryAt = 0), radarRequest);
     const token = ++layerToken;
     stop();
     ++frameToken;
@@ -534,11 +604,9 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
     if (!init()) return;
     if (kind === "radar") await fetchRadar(force);
     else if (kind === "warnings") {
-      if (force) warningData = null;
-      await loadWarnings(token);
+      await loadWarnings(token, force);
     } else {
-      if (force) tropicalData = null;
-      await loadTropical(token);
+      await loadTropical(token, force);
     }
   }
   document
@@ -613,7 +681,7 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
       content.append(
         node(
           "p",
-          `${trackingItems.length} active alerts from NWS. Listed by severity; tap a warning on the map for its area.`,
+          `${trackingItems.length} non-expired alert records from NWS. Last checked ${warningData ? new Date(warningData.at).toLocaleTimeString() : "unknown"}. ${warningFailed || !navigator.onLine || Date.now() - (warningData?.at || 0) >= 120000 ? "Saved records are unverified; check weather.gov. " : ""}Listed by severity; tap a warning on the map for its area.`,
           "fine",
         ),
       );
@@ -684,15 +752,69 @@ export function createRadar({ getPlace, onSelect, showSheet }) {
       content,
     );
   };
+  async function refreshActive() {
+    if (!document.hidden && document.body.dataset.screen === "map") {
+      if (kind === "radar" && current > 0)
+        $("radar-age").textContent =
+          `${Math.max(0, Math.round((Date.now() / 1000 - current) / 60))} min old`;
+      if (!navigator.onLine) status("Offline · displayed map data is saved");
+      if (kind === "warnings") {
+        trackingFeatures = trackingFeatures.filter(
+          (f) => Date.parse(f.properties?.expires) > Date.now(),
+        );
+        trackingItems = trackingFeatures;
+        trackingLayer?.eachLayer((layer) => {
+          if (Date.parse(layer.feature?.properties?.expires) <= Date.now())
+            trackingLayer.removeLayer(layer);
+        });
+      }
+    }
+
+    if (
+      refreshBusy ||
+      document.hidden ||
+      document.body.dataset.screen !== "map" ||
+      !navigator.onLine ||
+      Date.now() < retryAt
+    )
+      return;
+    refreshBusy = true;
+    try {
+      if (kind === "radar") {
+        if (
+          radarFailed ||
+          !frames.length ||
+          Date.now() - lastRadarFetch >= 300000
+        )
+          await fetchRadar(radarFailed, true);
+        else if (current) frameCaption({ time: current });
+      } else if (
+        kind === "warnings" &&
+        (warningFailed ||
+          !warningData ||
+          Date.now() - (warningData?.at || 0) >= 120000)
+      )
+        await loadWarnings(layerToken, warningFailed);
+      else if (
+        kind === "tropical" &&
+        (tropicalFailed ||
+          !tropicalData ||
+          Date.now() - tropicalData.at >= 600000)
+      )
+        await loadTropical(layerToken, tropicalFailed);
+    } finally {
+      refreshBusy = false;
+    }
+  }
   function enter() {
     if (!init()) return;
     requestAnimationFrame(() => map.invalidateSize());
-    if (
-      kind === "radar" &&
-      (!frames.length || Date.now() - lastRadarFetch > 300000)
-    )
-      fetchRadar();
+    void refreshActive();
   }
+  setInterval(refreshActive, 30000);
+  addEventListener("online", () => {
+    if (document.body.dataset.screen === "map") enter();
+  });
   addEventListener("truecast:route", (e) => {
     if (e.detail.route === "map") enter();
     else stop();

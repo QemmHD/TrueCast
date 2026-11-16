@@ -1,13 +1,14 @@
 {
   "name": "truecast-weather",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
   "description": "Static TrueCast weather PWA for GitHub Pages",
   "scripts": {
     "start": "python3 -m http.server 8766",
-    "test": "node tests/review.cjs"
+    "test": "node --test tests/freshness.test.mjs && node tests/refresh-review.cjs && node tests/update-review.cjs && node tests/review.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"
-  }
+  },
+  "type": "module"
 }

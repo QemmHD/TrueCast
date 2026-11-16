@@ -2407,3 +2407,24 @@ body[data-screen="map"] .offline-banner {
   border-left: 3px solid currentColor;
   border-right: 3px solid currentColor;
 }
+
+.official-period {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.official-period h3 {
+  margin: 0 0 9px;
+  font-size: 16px;
+}
+.official-period p {
+  line-height: 1.65;
+}
+.source-warning {
+  color: var(--warm, #ffd180);
+  line-height: 1.6;
+}
+#status {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}

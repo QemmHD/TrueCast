@@ -331,7 +331,17 @@ if (process.env.TRUECAST_BROWSER_PATH)
         .querySelector("#tracking-text")
         .textContent.includes("not an all-clear"),
     );
-    assert.equal(await page.locator("#tracking-list").isDisabled(), true);
+    assert.equal(await page.locator("#tracking-list").isDisabled(), false);
+    assert.match(
+      await page.locator("#map-data-status").innerText(),
+      /saved.*unverified/i,
+    );
+    await page.locator("#tracking-list").click();
+    assert.match(
+      await page.locator("#detail-content").innerText(),
+      /saved records are unverified/i,
+    );
+    await page.locator("#close-detail").click();
     console.log("PASS failed warning source never shown as no alerts");
     for (const [width, height] of [
       [360, 780],
@@ -381,7 +391,7 @@ if (process.env.TRUECAST_BROWSER_PATH)
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForFunction(
       () =>
-        document.querySelector("#freshness").textContent === "SAVED FORECAST",
+        document.querySelector("#freshness").textContent === "OFFLINE · SAVED",
     );
     await go("today");
     assert.equal(await page.locator("#offline-banner").isVisible(), true);

@@ -48,11 +48,48 @@ window
   .matchMedia("(display-mode: standalone)")
   .addEventListener("change", syncInstall);
 syncInstall();
+let workerRegistration;
+let applyingUpdate = false;
+function updateReady(registration, worker) {
+  workerRegistration = registration;
+  if (
+    navigator.serviceWorker.controller &&
+    registration.active &&
+    (registration.waiting || worker?.state === "installed")
+  )
+    document.getElementById("update-status").textContent =
+      "An app update is ready. Tap Check for updates to apply it.";
+}
+function applyUpdate(registration, candidate) {
+  const waiting =
+    registration.waiting ||
+    (candidate?.state === "installed" ? candidate : null);
+  if (!waiting) return false;
+  applyingUpdate = true;
+  document.getElementById("update-status").textContent = "Applying update…";
+  waiting.postMessage({ type: "ACTIVATE_UPDATE" });
+  return true;
+}
 if ("serviceWorker" in navigator && window.isSecureContext) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("./sw.js", { scope: "./", updateViaCache: "none" })
-      .catch(() => {});
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (applyingUpdate) location.reload();
+  });
+  window.addEventListener("load", async () => {
+    try {
+      const registration = await navigator.serviceWorker.register("./sw.js", {
+        scope: "./",
+        updateViaCache: "none",
+      });
+      workerRegistration = registration;
+      // A fully downloaded update from the last visit can be applied at startup.
+      if (registration.waiting) applyUpdate(registration);
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        worker?.addEventListener("statechange", () => {
+          if (worker.state === "installed") updateReady(registration, worker);
+        });
+      });
+    } catch {}
   });
 }
 document
@@ -67,11 +104,37 @@ document
     button.disabled = true;
     status.textContent = "Checking…";
     try {
-      const registration = await navigator.serviceWorker?.getRegistration();
-      if (registration) await registration.update();
-      location.reload();
+      const registration =
+        workerRegistration ||
+        (await navigator.serviceWorker?.getRegistration());
+      if (!registration) {
+        status.textContent =
+          "No app update service is registered in this browser.";
+        return;
+      }
+      if (applyUpdate(registration)) return;
+      await registration.update();
+      const candidate = registration.installing;
+      if (candidate) {
+        const worker = candidate;
+        await new Promise((resolve, reject) => {
+          const finish = () => {
+            if (worker.state === "installed" || worker.state === "activated")
+              resolve();
+            else if (worker.state === "redundant")
+              reject(new Error("Update incomplete"));
+          };
+          worker.addEventListener("statechange", finish);
+          finish();
+        });
+      }
+      if (!applyUpdate(registration, candidate))
+        status.textContent =
+          "TrueCast is up to date. Weather refreshes independently.";
     } catch {
-      status.textContent = "Could not check for updates. Please try again.";
+      status.textContent =
+        "Could not complete the update. Your current app is still available.";
+    } finally {
       button.disabled = false;
     }
   });

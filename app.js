@@ -1,6 +1,13 @@
 import { $, store, node, json, condition, weatherIcon } from "./api.js";
 import { initUI, sheet } from "./ui.js";
 import { createRadar } from "./radar.js";
+import { RefreshResource, freshnessText } from "./refresh.js";
+import {
+  activeHourIndex,
+  selectionAfterRefresh,
+  validForecast,
+} from "./forecast-time.js";
+import { nwsPoint, sourceTools } from "./sources.js";
 initUI();
 let unit = store.get("truecast-unit", "F"),
   measurements = store.get("truecast-measurements", "imperial");
@@ -23,12 +30,15 @@ let data,
   airStatus = "loading",
   alerts = { status: "loading", features: [] },
   generation = 0,
-  lastAttempt = 0,
-  retrieved = 0,
+  resources = {},
+  sourceStates = {},
+  renderedStart = null,
+  renderedDay = null,
+  selectedTime = null,
   metric = "temperature",
   selected = 0,
   detailType = "",
-  stale = false;
+  alertViewSignature = "";
 const temp = (n) =>
   Number.isFinite(n) ? `${Math.round(unit === "F" ? n * 1.8 + 32 : n)}°` : "—";
 const wind = (n) =>
@@ -68,8 +78,7 @@ const compass = (n) =>
     : "";
 function start() {
   if (!data) return 0;
-  const i = data.hourly.time.findIndex((t) => t * 1000 >= Date.now());
-  return i < 0 ? data.hourly.time.length : i;
+  return activeHourIndex(data.hourly.time);
 }
 function todayIndex() {
   const key = (t) =>
@@ -218,8 +227,14 @@ function render() {
   renderDays();
   renderPlan();
   renderAir();
-  savedPlaces();
-  if ($("detail-dialog").open && detailType) showDetail(detailType);
+  if ($("detail-dialog").open && detailType && detailType !== "alerts") {
+    const scroll = $("detail-dialog").scrollTop;
+    showDetail(detailType);
+    $("detail-dialog").scrollTop = scroll;
+  }
+  // Open sheets keep their scroll position during background updates.
+  renderedStart = start();
+  renderedDay = todayIndex();
 }
 function uvLabel(n) {
   return !Number.isFinite(n)
@@ -304,7 +319,7 @@ function renderForecast() {
     chart.prepend(
       node(
         "div",
-        `${metric === "temperature" ? "Temperature" : metric === "rain" ? "Hourly precipitation" : "Wind speed"} · ${metric === "temperature" ? (unit === "F" ? "°F" : "°C") : metric === "rain" ? (measurements === "imperial" ? "in" : "mm") : measurements === "imperial" ? "mph" : "km/h"}`,
+        `${metric === "temperature" ? "Temperature" : metric === "rain" ? "Hourly precipitation (hour ending at time shown)" : "Wind speed"} · ${metric === "temperature" ? (unit === "F" ? "°F" : "°C") : metric === "rain" ? (measurements === "imperial" ? "in" : "mm") : measurements === "imperial" ? "mph" : "km/h"}`,
         "chart-unit",
       ),
     );
@@ -354,7 +369,15 @@ function selectHour(index) {
     $("hour-detail").replaceChildren();
     return;
   }
-  $("selected-date").textContent = `${day(h.time[i])} · ${time(h.time[i])}`;
+  selectedTime = h.time[i];
+  $("selected-date").textContent =
+    `${day(h.time[i])} · ${new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit", timeZone: data.timezone, timeZoneName: "short" }).format(new Date(h.time[i] * 1000))}`;
+  $("selected-date").dataset.validAt = String(h.time[i]);
+  $("selected-date").title = new Intl.DateTimeFormat("en", {
+    timeZone: data.timezone,
+    dateStyle: "medium",
+    timeStyle: "long",
+  }).format(new Date(h.time[i] * 1000));
   $("selected-value").textContent = formatMetric(metricValue(i));
   $("selected-condition").textContent = condition(h.weather_code[i]);
   $("forecast-scrub").value = selected;
@@ -596,7 +619,7 @@ function showDetail(type) {
   content.append(
     node(
       "p",
-      `${stale ? "Saved" : "Retrieved"} ${new Date(retrieved).toLocaleString()} · ${data.timezone}`,
+      `${type === "aqi" ? "CAMS air quality" : "Open-Meteo model forecast"} · ${sourceStates[type === "aqi" ? "air" : "forecast"] ? freshnessText(sourceStates[type === "aqi" ? "air" : "forecast"], { time: (at) => new Date(at).toLocaleString("en", { timeZone: data.timezone, timeZoneName: "short" }) }) : "Unavailable"}`,
       "fine",
     ),
   );
@@ -691,17 +714,21 @@ function renderAir() {
             : n <= 300
               ? "Very unhealthy · US AQI"
               : "Hazardous · US AQI";
+  if (Number.isFinite(n) && airStatus === "saved")
+    $("aq-note").textContent = "Saved · " + $("aq-note").textContent;
 }
 function renderAlertsInto(content) {
   if (alerts.status === "loading") {
     content.append(node("p", "Checking official alerts…", "muted"));
     return;
   }
-  if (alerts.status !== "ok") {
+  if (alerts.status !== "ok" && alerts.status !== "unverified") {
     content.append(node("p", alerts.message, "muted"));
     return;
   }
-  if (!alerts.features.length)
+  if (alerts.status === "unverified")
+    content.append(node("p", alerts.message, "source-warning"));
+  if (!alerts.features.length && alerts.status === "ok")
     content.append(
       node(
         "p",
@@ -738,99 +765,196 @@ function updateAlertBadge() {
           ? "US"
           : "!";
   $("show-alerts").dataset.hasAlerts = String(alerts.features.length > 0);
-  if ($("detail-dialog").open && detailType === "alerts") showDetail("alerts");
+  const signature = JSON.stringify(alerts);
+  if (
+    $("detail-dialog").open &&
+    detailType === "alerts" &&
+    signature !== alertViewSignature
+  ) {
+    const scroll = $("detail-dialog").scrollTop;
+    showDetail("alerts");
+    $("detail-dialog").scrollTop = scroll;
+  }
+  alertViewSignature = signature;
 }
-async function loadAlerts(p, g) {
-  alerts = { status: "loading", features: [] };
-  updateAlertBadge();
-  if (p.country_code && p.country_code !== "US") {
-    alerts = {
+function keepView(renderContent) {
+  const elements = [
+    document.querySelector("main"),
+    $("hours"),
+    $("preview-hours"),
+  ];
+  const positions = elements.map((el) => [el.scrollLeft, el.scrollTop]);
+  const focused = document.activeElement;
+  const focusedHour = focused?.matches?.(".hour")
+    ? Number(focused.dataset.index)
+    : null;
+  renderContent();
+  if (focusedHour !== null)
+    $("hours").children[focusedHour]?.focus({ preventScroll: true });
+  elements.forEach((el, i) => {
+    el.scrollLeft = positions[i][0];
+    el.scrollTop = positions[i][1];
+  });
+}
+function currentAlerts(state) {
+  const body = state.data;
+  if (body?.unsupported)
+    return {
       status: "unsupported",
       features: [],
       message:
         "Official alerts currently cover the US. Alerts have not been checked here; consult your national weather service.",
     };
-    updateAlertBadge();
-    return;
-  }
-  try {
-    if (!p.country_code)
-      await json(
-        `https://api.weather.gov/points/${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`,
-      );
-    const r = await json(
-      `https://api.weather.gov/alerts/active?point=${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`,
-    );
-    if (g !== generation) return;
-    alerts = { status: "ok", features: r.features, at: Date.now() };
-  } catch (e) {
-    if (g !== generation) return;
-    alerts = {
-      status: e.status === 404 ? "unsupported" : "error",
+  const features = (body?.features || []).filter(
+    (f) => Date.parse(f.properties?.expires) > Date.now(),
+  );
+  if (!body)
+    return {
+      status: state.refreshing ? "loading" : "error",
       features: [],
       message:
-        e.status === 404
-          ? "NWS alerts do not cover this location. Consult your national weather service."
-          : "Official alerts could not be checked. Check weather.gov or your local authority.",
+        "Official alerts could not be checked. This is not an all-clear. Check weather.gov or your local authority.",
     };
-  }
-  updateAlertBadge();
+  return {
+    status: state.fresh ? "ok" : "unverified",
+    features,
+    at: state.checkedAt,
+    message: `${state.offline ? "Offline" : state.error ? "Alert refresh failed" : "Awaiting a fresh check"}. Last checked ${new Date(state.checkedAt).toLocaleTimeString()}. Listed warnings are saved and unverified; expired warnings are excluded. Check weather.gov for current instructions.`,
+  };
 }
-async function loadAir(p, g) {
-  air = null;
-  airStatus = "loading";
-  $("aqi").textContent = "—";
-  $("aq-note").textContent = "Loading…";
-  try {
-    const r = await json(
-      `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${p.latitude}&longitude=${p.longitude}&current=us_aqi,pm2_5,pm10,ozone`,
+function refreshLabels() {
+  const state = sourceStates.forecast;
+  if (!state) return;
+  $("status").textContent =
+    `${freshnessText(state, { label: "Forecast", time: (at) => time(at / 1000) })} · Open-Meteo`;
+  $("status").title = state.checkedAt
+    ? `Retrieved ${new Date(state.checkedAt).toLocaleString()}. Model conditions valid ${new Date(state.validAt).toLocaleString()}. This is not a station measurement or model issue time.`
+    : "No usable forecast";
+  $("freshness").textContent = !state.data
+    ? "UNAVAILABLE"
+    : state.offline
+      ? "OFFLINE · SAVED"
+      : state.error
+        ? "SAVED · RETRYING"
+        : state.delayed
+          ? "MODEL DATA DELAYED"
+          : state.fresh
+            ? "MODEL ESTIMATE"
+            : "SAVED · CHECK DUE";
+  $("refresh-weather").disabled = state.refreshing;
+  $("refresh-weather").title =
+    state.retryAt > Date.now()
+      ? `Source retry after ${new Date(state.retryAt).toLocaleTimeString()}`
+      : "Refresh weather";
+  document.body.dataset.loading = String(!state.data && state.refreshing);
+  for (const [name, snapshot] of Object.entries(sourceStates)) {
+    const field = document.getElementById(`source-state-${name}`);
+    if (field)
+      field.textContent = freshnessText(snapshot, {
+        label: name,
+        time: (at) => time(at / 1000),
+      });
+  }
+}
+function acceptForecast(state) {
+  sourceStates.forecast = state;
+  if (state.data && state.data !== data) {
+    const previous = selectedTime;
+    data = state.data;
+    selected = selectionAfterRefresh(
+      previous,
+      data.hourly.time,
+      Date.now(),
+      Number($("horizon").value),
     );
-    if (g !== generation) return;
-    air = r;
-    airStatus = "ok";
-  } catch {
-    if (g !== generation) return;
-    airStatus = "error";
+    keepView(render);
+  } else if (!state.data && data) {
+    data = null;
+    clearWeather();
   }
-  renderAir();
-  if ($("detail-dialog").open && detailType === "aqi") showDetail("aqi");
+  if (!state.data && !state.refreshing) {
+    $("condition").textContent = "Weather unavailable";
+    $("change-brief").textContent = "Reconnect or try another place.";
+  }
+  refreshLabels();
 }
-function validWeather(d) {
-  return (
-    d?.current && Array.isArray(d.hourly?.time) && Array.isArray(d.daily?.time)
-  );
-}
-async function load(p, force = false) {
-  const g = ++generation;
-  place = p;
-  lastAttempt = Date.now();
-  data = null;
-  selected = 0;
-  air = null;
-  $("refresh-weather").disabled = true;
-  document.body.dataset.loading = "true";
-  ["range", "feels", "wind", "today-rain", "today-sunset", "uv"].forEach(
+function clearWeather() {
+  ["range", "feels", "wind", "today-rain", "today-sunset", "uv", "aqi"].forEach(
     (id) => ($(id).textContent = "—"),
   );
+  $("temperature").textContent = "—°";
+  $("condition").textContent = "Updating forecast";
   $("rain-caption").textContent = "Updating…";
   $("wind-caption").textContent = "Updating…";
   $("date").textContent = "Updating local forecast";
+  $("uv-caption").textContent = "Daily maximum";
+  $("daylight-label").textContent = "—";
+  $("selected-date").textContent = "—";
+  delete $("selected-date").dataset.validAt;
+  $("change-brief").textContent = "Checking the next change…";
   $("weather-art").replaceChildren();
   $("daylight-progress").style.width = "0%";
-  $("status").textContent = `Updating ${p.name}…`;
-  $("freshness").textContent = "UPDATING";
-  $("temperature").textContent = "—°";
-  $("condition").textContent = "Updating forecast";
-  $("change-brief").textContent = "Checking the next change…";
+  for (const id of [
+    "preview-hours",
+    "hours",
+    "days",
+    "forecast-chart",
+    "hour-detail",
+    "other-windows",
+  ])
+    $(id).replaceChildren();
+  $("selected-value").textContent = "—";
+  $("selected-condition").textContent = "Forecast unavailable";
+  $("window").replaceChildren(
+    node("p", "Forecast unavailable. Refresh when online."),
+  );
+}
+function load(p, force = false) {
+  if (
+    resources.forecast &&
+    p.latitude === place.latitude &&
+    p.longitude === place.longitude
+  ) {
+    return Promise.all(
+      Object.values(resources).map((r) => r.refresh({ force })),
+    );
+  }
+  const g = ++generation;
+  Object.values(resources).forEach((r) => r.dispose());
+  resources = {};
+  sourceStates = {};
+  place = p;
+  data = null;
+  air = null;
+  airStatus = "loading";
+  selected = 0;
+  selectedTime = null;
+  alerts = { status: "loading", features: [] };
+  clearWeather();
+  updateAlertBadge();
+  renderAir();
+  $("place").textContent = p.name;
+  store.set("truecast-last", p);
+  savedPlaces();
   window.dispatchEvent(
     new CustomEvent("truecast:place", { detail: { name: p.name } }),
   );
-  void loadAir(p, g);
-  void loadAlerts(p, g);
-  const key = `truecast-forecast-v3-${p.latitude}-${p.longitude}`,
-    cached = store.get(key, null);
-  let result;
-  let isStale = !navigator.onLine;
+  radar.setPlace();
+  const id = `${p.latitude}-${p.longitude}`;
+  const add = (name, options) => {
+    const callback = options.onState;
+    resources[name] = new RefreshResource({
+      ...options,
+      storage: store,
+      onState: (state) => {
+        if (g !== generation) return;
+        sourceStates[name] = state;
+        callback(state);
+        refreshLabels();
+      },
+    });
+    resources[name].emit();
+  };
   const params = new URLSearchParams({
     latitude: p.latitude,
     longitude: p.longitude,
@@ -844,59 +968,111 @@ async function load(p, force = false) {
     timeformat: "unixtime",
     forecast_days: 10,
   });
-  try {
-    result =
-      !force && validWeather(cached?.body) && Date.now() - cached.at < 600000
-        ? cached
-        : {
-            at: Date.now(),
-            body: await json(
-              `https://api.open-meteo.com/v1/forecast?${params}`,
-            ),
-          };
-    if (!validWeather(result.body)) throw new Error("Incomplete forecast");
-  } catch {
-    if (validWeather(cached?.body) && Date.now() - cached.at < 86400000) {
-      result = cached;
-      isStale = true;
-    } else {
-      if (g !== generation) return;
-      $("status").textContent = "Forecast unavailable. Tap refresh to retry.";
-      $("freshness").textContent = "UNAVAILABLE";
-      $("condition").textContent = "Weather unavailable";
-      $("change-brief").textContent = "Reconnect or try another place.";
-      ["range", "feels", "wind", "today-rain", "today-sunset", "uv"].forEach(
-        (id) => ($(id).textContent = "—"),
+  add("forecast", {
+    key: `truecast-forecast-v3-${id}`,
+    ttl: 600000,
+    maxAge: 86400000,
+    loader: ({ signal }) =>
+      json(`https://api.open-meteo.com/v1/forecast?${params}`, {
+        signal,
+        metadata: true,
+        cache: "no-cache",
+      }),
+    validate: validForecast,
+    validAt: (d) => d.current.time * 1000,
+    sourceMaxAge: 2700000,
+    onState: acceptForecast,
+  });
+  add("air", {
+    key: `truecast-air-v4-${id}`,
+    ttl: 900000,
+    maxAge: 3600000,
+    loader: ({ signal }) =>
+      json(
+        `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${p.latitude}&longitude=${p.longitude}&current=us_aqi,pm2_5,pm10,ozone&timeformat=unixtime&timezone=auto`,
+        { signal, metadata: true, cache: "no-cache" },
+      ),
+    validate: (d) => d?.current && Number.isFinite(d.current.time),
+    validAt: (d) => d.current.time * 1000,
+    sourceMaxAge: 10800000,
+    onState: (state) => {
+      air = state.data;
+      airStatus = state.data
+        ? state.fresh
+          ? "ok"
+          : "saved"
+        : state.refreshing
+          ? "loading"
+          : "error";
+      renderAir();
+    },
+  });
+  add("alerts", {
+    key: `truecast-alerts-v4-${id}`,
+    ttl: (d) =>
+      d?.unsupported ? 21600000 : d?.features?.length ? 60000 : 120000,
+    maxAge: 1800000,
+    loader: async ({ signal }) => {
+      const point = await nwsPoint(p, { signal });
+      if (!point.supported) return { unsupported: true, features: [] };
+      return json(
+        `https://api.weather.gov/alerts/active?point=${p.latitude.toFixed(4)},${p.longitude.toFixed(4)}`,
+        { signal, cache: "no-cache" },
       );
-      $("preview-hours").replaceChildren();
-      $("hours").replaceChildren();
-      $("days").replaceChildren();
-      $("forecast-chart").replaceChildren();
-      $("selected-value").textContent = "—";
-      $("selected-condition").textContent = "Forecast unavailable";
-      $("hour-detail").replaceChildren();
-      $("window").replaceChildren(
-        node("p", "Forecast unavailable. Refresh when online."),
-      );
-      $("other-windows").replaceChildren();
-      $("refresh-weather").disabled = false;
-      document.body.dataset.loading = "false";
-      return;
-    }
+    },
+    validate: (d) => d?.unsupported === true || Array.isArray(d?.features),
+    onState: (state) => {
+      alerts = currentAlerts(state);
+      updateAlertBadge();
+    },
+  });
+  return Promise.all(Object.values(resources).map((r) => r.refresh({ force })));
+}
+function showFreshness() {
+  detailType = "";
+  const content = node("div");
+  for (const [name, label] of [
+    ["forecast", "Forecast · Open-Meteo best match"],
+    ["air", "Air quality · CAMS via Open-Meteo"],
+    ["alerts", "Official local alerts · NWS (US)"],
+  ]) {
+    const card = node("article", null, "official-period");
+    const value = node(
+      "p",
+      sourceStates[name]
+        ? freshnessText(sourceStates[name], {
+            label: name,
+            time: (at) => time(at / 1000),
+          })
+        : "Not checked",
+      "muted",
+    );
+    value.id = `source-state-${name}`;
+    card.append(node("h3", label), value);
+    content.append(card);
   }
-  if (g !== generation) return;
-  data = result.body;
-  stale = isStale;
-  document.body.dataset.loading = "false";
-  retrieved = result.at;
-  store.set(key, result);
-  store.set("truecast-last", p);
-  $("status").textContent =
-    `${stale ? "Saved forecast" : "Updated"} ${new Date(retrieved).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · Open-Meteo`;
-  $("freshness").textContent = stale ? "SAVED FORECAST" : "MODEL ESTIMATE";
-  $("refresh-weather").disabled = false;
-  render();
-  radar.setPlace();
+  content.append(
+    node(
+      "p",
+      "Valid time is when model conditions apply. Checked time is when TrueCast retrieved them; neither is a model run’s issue time. Radar timestamps describe observed frames. Model agreement is not an accuracy score.",
+      "fine",
+    ),
+  );
+  content.append(
+    node(
+      "p",
+      "While open: forecasts check every 10 minutes, air quality every 15, and US alerts every 1–2. Returning after two minutes prompts a forecast check; reconnecting checks all sources. Failures retain labeled saved data with retry delays. Forecasts older than 24 hours and air quality older than one hour are not shown.",
+      "fine",
+    ),
+  );
+  content.append(
+    node(
+      "p",
+      "iPhone pauses web apps in the background. TrueCast checks when you return; it cannot promise scheduled updates while closed, silent storm monitoring, or Dynamic Island Live Activities.",
+      "fine",
+    ),
+  );
+  sheet("Sources & freshness", content, "DATA TRANSPARENCY");
 }
 const radar = createRadar({
   getPlace: () => place,
@@ -1012,13 +1188,54 @@ $("locate").onclick = () => {
     { timeout: 15000, maximumAge: 300000 },
   );
 };
-addEventListener("online", () => load(place, true));
+let lastWake = 0;
+function tickSources() {
+  if (document.hidden) return;
+  Object.values(resources).forEach((r) => r.tick());
+  if (data && (start() !== renderedStart || todayIndex() !== renderedDay)) {
+    selected = selectionAfterRefresh(
+      selectedTime,
+      data.hourly.time,
+      Date.now(),
+      Number($("horizon").value),
+    );
+    keepView(render);
+  }
+}
+function wakeSources(reconnect = false) {
+  if (document.hidden || Date.now() - lastWake < 1000) return;
+  lastWake = Date.now();
+  for (const [name, resource] of Object.entries(resources)) {
+    const age = resource.snapshot().age;
+    resource.refresh({
+      force:
+        reconnect ||
+        age > { forecast: 120000, air: 600000, alerts: 30000 }[name],
+    });
+  }
+  tickSources();
+}
+addEventListener("online", () => wakeSources(true));
+addEventListener("offline", tickSources);
+addEventListener("pageshow", () => wakeSources());
+addEventListener("focus", () => wakeSources());
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && Date.now() - lastAttempt > 600000) load(place);
+  if (!document.hidden) wakeSources();
 });
-setInterval(() => {
-  if (!document.hidden && Date.now() - lastAttempt > 600000) load(place);
-}, 60000);
+setInterval(tickSources, 15000);
+const officialSources = sourceTools({
+  getPlace: () => place,
+  temp,
+  wind,
+  measurements: () => measurements,
+  present: (title, content) => {
+    detailType = "";
+    sheet(title, content, "OFFICIAL LOCAL SOURCE");
+  },
+});
+$("source-freshness").onclick = showFreshness;
+$("official-outlook").onclick = officialSources.outlook;
+$("station-observation").onclick = officialSources.observation;
 savedPlaces();
 load(place);
 if (document.body.dataset.screen === "map") radar.enter();

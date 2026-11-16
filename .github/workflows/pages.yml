@@ -22,7 +22,7 @@ jobs:
       - name: Prepare public app
         run: |
           mkdir -p _site
-          cp index.html style.css app.js api.js radar.js ui.js install.js sw.js manifest.webmanifest .nojekyll _site/
+          cp index.html style.css app.js api.js refresh.js forecast-time.js sources.js radar.js ui.js install.js sw.js manifest.webmanifest .nojekyll _site/
           cp -r icons _site/icons
       - uses: actions/upload-pages-artifact@v3
         with:

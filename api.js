@@ -19,22 +19,50 @@ export function node(tag, text, cls) {
   if (cls) n.className = cls;
   return n;
 }
-export async function json(url, timeoutMs = 18000) {
+export async function json(url, options = 18000) {
+  const settings =
+    typeof options === "number" ? { timeoutMs: options } : options;
   const controller = new AbortController(),
-    timer = setTimeout(() => controller.abort(), timeoutMs);
+    abort = () => controller.abort();
+  if (settings.signal?.aborted) controller.abort();
+  else settings.signal?.addEventListener("abort", abort, { once: true });
+  const timer = setTimeout(abort, settings.timeoutMs || 18000);
   try {
-    const r = await fetch(url, { signal: controller.signal });
+    const r = await fetch(url, {
+      signal: controller.signal,
+      cache: settings.cache || "default",
+    });
     if (!r.ok) {
       const e = new Error(`Source returned ${r.status}`);
       e.status = r.status;
+      const retry = r.headers.get("retry-after");
+      if (retry) {
+        const seconds = Number(retry);
+        e.retryAt = Number.isFinite(seconds)
+          ? Date.now() + seconds * 1000
+          : Date.parse(retry) || 0;
+      }
       throw e;
     }
     const d = await r.json();
     if (d.error)
       throw new Error(d.reason || d.error.message || "Source unavailable");
-    return d;
+    const maxAge = Number(
+      /(?:^|,)\s*max-age=(\d+)/i.exec(
+        r.headers.get("cache-control") || "",
+      )?.[1],
+    );
+    const age = Number(r.headers.get("age") || 0),
+      expires = Date.parse(r.headers.get("expires") || "");
+    const expiresAt = Number.isFinite(expires)
+      ? expires
+      : maxAge > 0
+        ? Date.now() + Math.max(0, maxAge - age) * 1000
+        : null;
+    return settings.metadata ? { body: d, expiresAt } : d;
   } finally {
     clearTimeout(timer);
+    settings.signal?.removeEventListener("abort", abort);
   }
 }
 export const condition = (code) =>

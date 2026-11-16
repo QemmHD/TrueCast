@@ -1,3 +1,5 @@
+> Provider/refresh update: [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) contains current 3.1 findings, including Xweather/Foreca free allowances, Google experimental minute-forecast restrictions and iPhone background limits. This original document is historical planning context.
+
 > Release update: TrueCast 3.0 adds official NHC regional tracks/cones, official US warning geometry/affected-zone lookup, model comparison and the redesigned dark interface. See README.md for the current feature list; unimplemented/parity labels below describe the earlier roadmap unless explicitly updated.
 
 # TrueCast's WeatherBug replacement target
