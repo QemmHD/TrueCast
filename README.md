@@ -18,13 +18,13 @@ All application paths are relative, so both `username.github.io/TrueCast/` and a
 - A daylight activity window with transparent rain, wind and temperature thresholds.
 - On-demand interactive map, past radar animation, coverage mask and click-to-forecast.
 - US AQI estimates, UV maximum, sunrise/sunset, humidity, dew point, gusts, pressure and visibility.
-- NWS alerts for searched US locations. GPS and map pins have no country metadata, so alert availability is explicitly unknown there.
+- NWS alerts for searched US locations. GPS/map pins check NWS point coverage first; unsupported locations and failed checks remain explicit.
 - Ten-minute browser forecast cache with dated stale fallback and independent provider failure states.
 - Responsive layout, keyboard controls, screen-reader status, reduced-motion support.
 
 ## Limits
 
-This starter does not implement the entire roadmap. Read PLAN.md for researched API choices, design specifications, premium roadmap and release gates. This release uses Leaflet, not the planned MapLibre renderer. It has no account sync, push service, future radar, lightning, pollen, ensemble bands, or true minute-level rain prediction. The horizon is decorative, not an astronomical chart. Units switch temperature only; wind stays labeled km/h and precipitation mm.
+This starter does not implement the entire roadmap. Read PLAN.md for researched API choices, design specifications, premium roadmap and release gates. This release uses Leaflet, not the planned MapLibre renderer. It has no account sync, push service, future radar, lightning, pollen, ensemble bands, or true minute-level rain prediction. The horizon is decorative, not an astronomical chart. Temperature and metric/US measurement preferences are available in Settings.
 
 Open-Meteo's hosted free tier is noncommercial. RainViewer's public service targets personal, educational and small community projects. Keep attribution visible. OpenStreetMap public tiles must follow their usage policy (https://operations.osmfoundation.org/policies/tiles/): no offline tile downloading or prefetching, visible attribution and cache headers respected. Use a suitable basemap provider as traffic grows.
 
@@ -47,3 +47,12 @@ After the first successful online visit, the app shell is cached. A saved foreca
 
 Repository: https://github.com/QemmHD/TrueCast
 Expected Pages address after activation: https://qemmhd.github.io/TrueCast/
+
+
+## App interface
+
+TrueCast now uses five hash-based screens: Today, Forecast, Map, Plan and Settings. Phones have a fixed bottom navigation bar with safe-area support; tablets and desktop have a navigation rail. Hash routes work on GitHub Pages without server rewrites. A location dialog provides search, optional geolocation and saved-place management.
+
+Settings include light/dark/system appearance, Celsius/Fahrenheit, metric/US measurements, cross-platform installation help and an update check. Android/desktop browsers supporting `beforeinstallprompt` can offer a native installation prompt; iPhone/iPad use Safari's Add to Home Screen. Unsupported browsers retain website access. No App Store or Google Play listing has been submitted.
+
+Forecast includes a data-backed temperature chart and expandable daily details. The map has opacity and recenter controls and pauses playback when leaving the screen. Foreground weather is refreshed on request, reconnection or return after the cache expires; background monitoring is not provided.

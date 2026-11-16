@@ -30,3 +30,8 @@ The updated live-browser checks passed: 10 daily forecasts; range selection from
 Local Chromium checks using the iPhone 13 device profile passed: ten-day live forecast, 144-hour range, 16px mobile inputs, no horizontal overflow, installation dialog, registered controlling service worker, and offline app-shell reload with a visibly saved forecast. No uncaught page errors were observed. Icons and web manifest were generated and validated. This is device emulation, not a physical iPhone test. WebKit testing could not run because the environment lacks required system libraries.
 
 A cached app shell is now implemented; earlier statements about no offline shell describe the previous release. Network providers and map tiles are intentionally excluded from the service worker cache. Full WeatherBug parity, lightning/forecast storm tracking, native widgets and background notifications remain future work.
+
+
+## App interface release
+
+Passed live-provider browser checks in an iPhone 13 Chromium profile: location dialog focus and Escape; New York city search; saved-place removal; 144-hour outlook, data chart and daily expansion; persisted dark theme, Fahrenheit and US units; cross-platform install guide; radar playback, opacity and pause-on-navigation; outdoor planner and warning shortcut. All five screens were checked at 360, 390, 768 and 1440 pixels without horizontal overflow. Offline service-worker reload, cached forecast, offline tab navigation and update-check feedback passed. Zero uncaught browser errors were observed. Screenshots were inspected during implementation. These are browser/device-emulation results, not physical iPhone or Android hardware certification, App Store review or a full assistive-technology audit.

@@ -1,7 +1,7 @@
 // Cache only the app shell. Forecast APIs and map tiles retain normal network behavior.
-const CACHE = 'truecast-shell-v1';
+const CACHE = 'truecast-shell-v2';
 const ROOT = new URL('./', self.location.href);
-const SHELL = ['index.html', 'style.css', 'app.js', 'install.js', 'manifest.webmanifest',
+const SHELL = ['index.html', 'style.css', 'app.js', 'ui.js', 'install.js', 'manifest.webmanifest',
   'icons/apple-touch-icon.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 const shellURLs = new Set(SHELL.map(path => new URL(path, ROOT).href));
 self.addEventListener('install', event => {
