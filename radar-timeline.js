@@ -187,6 +187,11 @@ export function createRadarTimeline({
     $("frame").dataset.frameCount = String(frames.length);
   }
   function caption(frame) {
+    // The location timezone can arrive after the first map frame.
+    $("radar-start").textContent = frames.length ? format(frames[0].time) : "—";
+    $("radar-end").textContent = frames.length
+      ? format(frames.at(-1).time)
+      : "—";
     $("radar-time").textContent = `${format(frame.time)} local`;
     $("radar-time").dataset.validAt = String(frame.time);
     $("radar-time").dataset.frameType = frame.type;
