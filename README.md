@@ -1,4 +1,4 @@
-# TrueCast Atmosphere 4.0
+# TrueCast Atmosphere 4.1
 
 An installable, dark weather app served from GitHub Pages. No framework build or API keys are required for this personal, noncommercial edition.
 
@@ -6,6 +6,11 @@ An installable, dark weather app served from GitHub Pages. No framework build or
 **Repository:** https://github.com/QemmHD/TrueCast
 
 ## In this release
+
+- One radar timeline defaults to **Both**: six hours of NOAA MRMS history and up to six hours of HRRR simulated future reflectivity in US coverage. Past/Future controls filter the bar; NOW marks the boundary.
+- Buffered, bounded frame caching and smooth opacity blending. Zoom/pan keeps playback enabled and resumes frame advancement when the view settles. This blends native frames, not optical-flow storm motion.
+- Forecast chart scrubbing moves the hourly weather strip proportionally; swiping the strip updates the chart selection.
+- Weather, air quality and supported local US alert checks about every ten seconds while visible, with coalescing, cancellation and rate-limit backoff. Source publication times remain independent.
 
 - Future global ICON maps for precipitation, temperature, wind and pressure, with published forecast/run times and a timeline up to 72 hours.
 - Public NOAA lightning-density and infrared satellite maps with observed timelines, source age and coverage labels.
@@ -35,7 +40,7 @@ On iPhone/iPad: open the live site in Safari → Share → Add to Home Screen �
 
 The existing installation receives web updates. Deployment automatically fingerprints the published files, so app changes trigger an update without a manual cache-version edit. Reopen while online, or use More → Check for updates. A complete downloaded update applies on the next startup; it does not reload an active session automatically. The app shell, a forecast no more than 24 hours old and air quality no more than one hour old can reopen offline with saved-data labels. Fresh maps, searches and verified alerts need a connection.
 
-Weather checks run while the app is visible: forecast every 10 minutes, air quality every 15, local US alerts every 1–2. Returning to the app rechecks aged sources and reconnecting requests fresh data. iPhone can suspend closed/background web apps; scheduled silent closed-app refresh and continuous storm monitoring are not promised.
+Weather, air quality and supported local US alerts are checked about every ten seconds while the app is visible. US radar metadata is checked on the same cadence; other map products retain source-specific caches. Polling does not make providers publish new observations every ten seconds. Returning to the app rechecks aged sources and reconnecting requests fresh data. iPhone can suspend closed/background web apps; scheduled silent closed-app refresh and continuous storm monitoring are not promised.
 
 ## Local development and review
 
@@ -47,10 +52,10 @@ The deployment workflow uploads only app files, icons and licensed vendor assets
 
 ## Data and limits
 
-Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: RainViewer. Future fields: DWD ICON. Observed lightning density and infrared satellite: NOAA nowCOAST. Warnings, independent official forecast/observations and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See [ATMOSPHERE-RELEASE.md](ATMOSPHERE-RELEASE.md) for current 4.0 sources, screenshot checks and validation, [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) for the expanded provider/refresh review, [COMPETITOR-RESEARCH.md](COMPETITOR-RESEARCH.md) for app comparisons and [REVIEW.md](REVIEW.md) for validation.
+Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: NOAA MRMS in US coverage, RainViewer elsewhere. US future reflectivity: NOAA HRRR via Iowa Environmental Mesonet. Global future fields: DWD ICON. Observed lightning density and infrared satellite: NOAA nowCOAST. Warnings, independent official forecast/observations and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md) for 4.1 radar sources, playback and refresh behavior, [ATMOSPHERE-RELEASE.md](ATMOSPHERE-RELEASE.md) for 4.0 sources, screenshot checks and validation, [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) for the expanded provider/refresh review, [COMPETITOR-RESEARCH.md](COMPETITOR-RESEARCH.md) for app comparisons and [REVIEW.md](REVIEW.md) for validation.
 
 Open-Meteo's hosted free tier is noncommercial; queries are weighted by variables/models and have rate limits. RainViewer's public service targets personal/educational/small community use. OpenStreetMap public tiles require normal browser caching, visible attribution and no bulk/offline tile downloading. An expanding commercial product needs suitable provider licensing and hosting.
 
-There is no individual-strike lightning feed, minute-specific rain nowcast, raw Doppler/velocity product, global tropical feed, native widgets or background push service. NOAA-derived lightning density is a regional gridded product, not a nearest-strike distance. Surface wind is not storm-cell motion. The future maps use DWD spatial fields; model point forecasts alone do not paint them. No forecast superiority claim is made without regional measurement. National warnings remain authoritative; map coverage gaps, failed sources and incomplete geometry must not be shown as safe conditions.
+There is no individual-strike lightning feed, minute-specific rain nowcast, raw Doppler/velocity product, global tropical feed, native widgets or background push service. NOAA-derived lightning density is a regional gridded product, not a nearest-strike distance. Surface wind is not storm-cell motion. Outside US coverage, RainViewer history is generally around two hours, and future precipitation uses coarse DWD six-hour totals rather than simulated reflectivity. No global six-hour radar-history claim is made. The future field maps use DWD spatial fields; model point forecasts alone do not paint them. No forecast superiority claim is made without regional measurement. National warnings remain authoritative; map coverage gaps, failed sources and incomplete geometry must not be shown as safe conditions.
 
-Saved locations/preferences remain on this device. Selected coordinates go to the requested weather providers; map tiles go to OpenStreetMap/RainViewer. No analytics, user account or API secrets are included. See the in-app coverage/privacy section for details.
+Saved locations/preferences remain on this device. Selected coordinates go to the requested weather providers; map tiles go to OpenStreetMap, NOAA, Iowa Environmental Mesonet, RainViewer and DWD. No analytics, user account or API secrets are included. See the in-app coverage/privacy section for details.

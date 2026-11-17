@@ -22,7 +22,7 @@ const server = createServer(async (req, res) => {
       );
     if (filename.endsWith("index.html"))
       body = Buffer.from(
-        body.toString().replace(">4.0</span>", `>review-${version}</span>`),
+        body.toString().replace(">4.1</span>", `>review-${version}</span>`),
       );
     const ext = path.extname(filename),
       types = {
@@ -97,7 +97,7 @@ const server = createServer(async (req, res) => {
         const c = await caches.open("truecast-shell-review-2");
         return (await c.keys()).length;
       }),
-      19,
+      21,
     );
     version = 3;
     await page.evaluate(async () => {
@@ -121,7 +121,7 @@ const server = createServer(async (req, res) => {
     );
     assert.deepEqual(errors, []);
     console.log(
-      "PASS real service-worker upgrade: complete 19-file shell, no interrupted search, automatic next-launch update, manual apply and offline reopen",
+      "PASS real service-worker upgrade: complete 21-file shell, no interrupted search, automatic next-launch update, manual apply and offline reopen",
     );
   } finally {
     await browser.close();

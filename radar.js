@@ -1,3 +1,4 @@
+import { createRadarTimeline } from "./radar-timeline.js";
 import { createWeatherMaps } from "./weather-maps.js";
 import { $, json, node } from "./api.js";
 const NHC =
@@ -12,27 +13,13 @@ export function createRadar({
 }) {
   let map,
     marker,
-    radarLayer,
-    pendingLayer,
-    coverageLayer,
     trackingLayer,
     zoneLayer,
-    host,
-    allFrames = [],
-    frames = [],
-    current = -1,
-    frameToken = 0,
     kind = "radar",
-    playing = false,
-    timer,
-    speed = 1,
-    lastRadarFetch = 0,
     layerToken = 0,
     pin,
     refreshBusy = false,
     retryAt = 0,
-    radarRequest,
-    radarFailed = false,
     warningFailed = false,
     tropicalFailed = false,
     futureViewSet = false;
@@ -40,6 +27,7 @@ export function createRadar({
     tropicalData,
     trackingFeatures = [],
     trackingItems = [];
+  document.body.dataset.mapLayer = kind;
   const status = (text) => ($("map-data-status").textContent = text);
   const fieldLayer = (k) => ["forecast", "satellite", "lightning"].includes(k);
   const weatherMaps = createWeatherMaps({
@@ -53,19 +41,19 @@ export function createRadar({
     status,
     showSheet,
   });
-  const shortTime = (t) =>
-    new Date(t * 1000).toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+  const timeline = createRadarTimeline({
+    getMap: () => map,
+    getPlace,
+    getTimezone,
+    getOpacity: () => Number($("radar-opacity").value) / 100,
+    isActive: () => kind === "radar" && document.body.dataset.screen === "map",
+    status,
+  });
   const remove = (layer) => {
     if (layer && map?.hasLayer(layer)) map.removeLayer(layer);
   };
   function stop() {
-    playing = false;
-    clearTimeout(timer);
-    $("play").replaceChildren(node("span", null, "play-icon"));
-    $("play").setAttribute("aria-label", "Play radar animation");
+    timeline.stop();
   }
   function init() {
     if (map) return true;
@@ -116,179 +104,14 @@ export function createRadar({
       marker.setLatLng(e.latlng);
     });
     map.on("movestart", () => {
-      if (playing) stop();
-      weatherMaps.stop();
+      timeline.moving(true);
+      weatherMaps.beginMove();
     });
-    map.on("moveend resize", () => weatherMaps.requestView());
+    map.on("moveend resize", () => {
+      timeline.moving(false);
+      weatherMaps.requestView();
+    });
     return true;
-  }
-  function frameCaption(f) {
-    $("radar-time").textContent = `${shortTime(f.time)} local`;
-    $("radar-age").textContent =
-      `${Math.max(0, Math.round((Date.now() / 1000 - f.time) / 60))} min old`;
-    $("map-data-status").textContent = !navigator.onLine
-      ? "Offline · displayed frame is saved"
-      : radarFailed
-        ? "Radar check failed · displayed frame is saved"
-        : "Past radar · not a future forecast";
-  }
-  async function showFrame(index) {
-    if (kind !== "radar" || !frames.length || !map) return false;
-    const f = frames[index];
-    if (!f) return false;
-    $("frame").value = index;
-    if (current === f.time && radarLayer) {
-      frameCaption(f);
-      return true;
-    }
-    const token = ++frameToken;
-    remove(pendingLayer);
-    const candidate = L.tileLayer(
-      `${host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`,
-      {
-        pane: "weather",
-        opacity: 0,
-        maxNativeZoom: 7,
-        maxZoom: 14,
-        attribution: '<a href="https://rainviewer.com">RainViewer</a>',
-      },
-    );
-    pendingLayer = candidate;
-    const loaded = await new Promise((resolve) => {
-      let bad = false,
-        done = false;
-      const finish = (ok) => {
-        if (done) return;
-        done = true;
-        clearTimeout(timeout);
-        resolve(ok);
-      };
-      const timeout = setTimeout(() => finish(false), 10000);
-      candidate.on("tileerror", () => {
-        bad = true;
-      });
-      candidate.once("load", () => finish(!bad));
-      candidate.addTo(map);
-    });
-    if (token !== frameToken || kind !== "radar") {
-      remove(candidate);
-      return false;
-    }
-    pendingLayer = null;
-    if (!loaded) {
-      remove(candidate);
-      status("Some radar tiles could not load. Try Latest.");
-      return false;
-    }
-    const old = radarLayer;
-    radarLayer = candidate;
-    radarLayer.setOpacity(Number($("radar-opacity").value) / 100);
-    remove(old);
-    current = f.time;
-    frameCaption(f);
-    return true;
-  }
-  function history() {
-    const minutes = Number($("loop-length").value),
-      last = allFrames.at(-1)?.time || 0;
-    frames = allFrames.filter((f) => f.time >= last - minutes * 60);
-    $("frame").max = Math.max(0, frames.length - 1);
-    $("frame").value = Math.max(0, frames.length - 1);
-    $("radar-start").textContent = frames.length
-      ? shortTime(frames[0].time)
-      : "—";
-    $("radar-end").textContent = frames.length
-      ? shortTime(frames.at(-1).time)
-      : "—";
-    $("frame").disabled = !frames.length;
-    $("play").disabled = !frames.length;
-  }
-  function fetchRadar(force = false, preserve = false) {
-    if (radarRequest) return radarRequest;
-    radarRequest = retrieveRadar(force, preserve).finally(() => {
-      radarRequest = null;
-    });
-    return radarRequest;
-  }
-  async function retrieveRadar(force = false, preserve = false) {
-    if (!init() || !navigator.onLine || Date.now() < retryAt) return;
-    const previous = current,
-      followLatest = current === allFrames.at(-1)?.time;
-    if (!force && Date.now() - lastRadarFetch < 300000 && allFrames.length) {
-      history();
-      await showFrame(
-        preserve && !followLatest
-          ? Math.max(
-              0,
-              frames.findIndex((f) => f.time === previous),
-            )
-          : frames.length - 1,
-      );
-      return;
-    }
-    const requestedLayer = layerToken;
-    status("Loading observed radar…");
-    $("radar-latest").disabled = true;
-    try {
-      const r = await json(
-        "https://api.rainviewer.com/public/weather-maps.json",
-      );
-      if (kind !== "radar" || requestedLayer !== layerToken) return;
-      if (
-        !Array.isArray(r.radar?.past) ||
-        !r.radar.past.length ||
-        !r.host?.startsWith("https://")
-      )
-        throw new Error("No past radar");
-      host = r.host;
-      allFrames = r.radar.past.filter(
-        (f) =>
-          Number.isFinite(f.time) &&
-          typeof f.path === "string" &&
-          f.time <= Date.now() / 1000 + 60,
-      );
-      if (!allFrames.length) throw new Error("No valid frames");
-      radarFailed = false;
-      lastRadarFetch = Date.now();
-      ((retryAt = 0), radarRequest);
-      history();
-      remove(coverageLayer);
-      coverageLayer = L.tileLayer(
-        `${host}/v2/coverage/0/256/{z}/{x}/{y}/0/0_0.png`,
-        { pane: "weather", maxNativeZoom: 7, maxZoom: 14, opacity: 0.6 },
-      );
-      if ($("coverage").checked && kind === "radar") coverageLayer.addTo(map);
-      await showFrame(
-        preserve && !followLatest
-          ? Math.max(
-              0,
-              frames.findIndex((f) => f.time === previous),
-            )
-          : frames.length - 1,
-      );
-    } catch (error) {
-      if (kind !== "radar" || requestedLayer !== layerToken) return;
-      radarFailed = true;
-      retryAt = Math.max(Date.now() + 60000, error.retryAt || 0);
-      status(
-        radarLayer
-          ? "Radar check failed · displayed frame is saved"
-          : "Radar unavailable. Tap Latest to retry.",
-      );
-      if (!radarLayer) $("radar-time").textContent = "No observed frame loaded";
-    } finally {
-      $("radar-latest").disabled = false;
-    }
-  }
-  async function tick() {
-    if (!playing || kind !== "radar") return;
-    const next = (Number($("frame").value) + 1) % frames.length;
-    await showFrame(next);
-    if (playing)
-      timer = setTimeout(
-        tick,
-        (next === frames.length - 1 ? 1500 : 550) / speed,
-      );
   }
   const color = (p) =>
     p.severity === "Extreme"
@@ -580,22 +403,18 @@ export function createRadar({
       if (kind === "warnings") return loadWarnings(layerToken, true);
       if (kind === "tropical") return loadTropical(layerToken, true);
     }
+    timeline.deactivate();
     weatherMaps.hide();
     kind = next;
     retryAt = 0;
     const token = ++layerToken;
     stop();
-    ++frameToken;
-    remove(pendingLayer);
-    pendingLayer = null;
+
     remove(trackingLayer);
     trackingLayer = null;
     remove(zoneLayer);
     zoneLayer = null;
-    remove(coverageLayer);
-    remove(radarLayer);
-    current = -1;
-    radarLayer = null;
+
     trackingItems = [];
     trackingFeatures = [];
     document
@@ -618,6 +437,8 @@ export function createRadar({
       return;
     }
     $("radar-playback").hidden = kind !== "radar";
+    for (const id of ["radar-window", "radar-availability", "radar-blend-note"])
+      $(id).hidden = kind !== "radar";
     $("tracking-summary").hidden = kind === "radar";
     $("radar-time-kind").textContent =
       kind === "radar"
@@ -633,7 +454,7 @@ export function createRadar({
           : "NHC TRACKS & CONES";
     $("map-source").textContent =
       kind === "radar"
-        ? "RainViewer · Composite frame time; coverage varies"
+        ? "NOAA MRMS / HRRR in US coverage · RainViewer / DWD elsewhere"
         : kind === "warnings"
           ? "National Weather Service · Some alerts have no polygon"
           : "NOAA / NHC · Cone ≠ complete impact area";
@@ -641,7 +462,7 @@ export function createRadar({
     $("tracking-text").textContent = "Loading official data…";
     $("tracking-list").disabled = true;
     $("tracking-fit").disabled = true;
-    if (kind === "radar") await fetchRadar(force);
+    if (kind === "radar") await timeline.refresh({ force });
     else if (kind === "warnings") await loadWarnings(token, force);
     else await loadTropical(token, force);
   }
@@ -649,51 +470,20 @@ export function createRadar({
     .querySelectorAll("[data-layer]")
     .forEach((b) => (b.onclick = () => selectLayer(b.dataset.layer)));
   $("radar-latest").onclick = () => {
-    if (kind === "radar") {
-      stop();
-      fetchRadar(true);
-    } else selectLayer(kind, true);
-  };
-  $("frame").oninput = () => {
-    stop();
-    showFrame(Number($("frame").value));
-  };
-  $("play").onclick = () => {
-    if (playing) stop();
-    else if (frames.length) {
-      playing = true;
-      $("play").replaceChildren(node("span", null, "pause-icon"));
-      $("play").setAttribute("aria-label", "Pause radar animation");
-      tick();
-    }
-  };
-  $("speed").onclick = () => {
-    speed = speed === 1 ? 2 : speed === 2 ? 0.5 : 1;
-    $("speed").textContent = `${speed}×`;
-    $("speed").setAttribute(
-      "aria-label",
-      `Radar speed ${speed} times. Change speed`,
-    );
-  };
-  $("loop-length").onchange = () => {
-    stop();
-    history();
-    showFrame(frames.length - 1);
+    if (kind === "radar") timeline.latest();
+    else selectLayer(kind, true);
   };
   $("radar-opacity").oninput = () => {
     const v = Number($("radar-opacity").value);
     $("opacity-value").textContent = `${v}%`;
-    radarLayer?.setOpacity(v / 100);
+    timeline.setOpacity();
     weatherMaps.setOpacity(v / 100);
     trackingLayer?.setStyle?.({
       opacity: v / 100,
       fillOpacity: (v / 100) * 0.2,
     });
   };
-  $("coverage").onchange = () => {
-    if (kind === "radar" && coverageLayer)
-      $("coverage").checked ? coverageLayer.addTo(map) : remove(coverageLayer);
-  };
+  $("coverage").onchange = () => timeline.setCoverage();
   $("map-options").onclick = () => $("map-dialog").showModal();
   $("map-zoom-in").onclick = () => map?.zoomIn();
   $("map-zoom-out").onclick = () => map?.zoomOut();
@@ -708,7 +498,12 @@ export function createRadar({
   $("point-forecast").onclick = () => {
     if (pin)
       onSelect(pin, {
-        validTime: fieldLayer(kind) ? weatherMaps.selectedTime() : null,
+        validTime:
+          kind === "radar"
+            ? timeline.selectedTime()
+            : fieldLayer(kind)
+              ? weatherMaps.selectedTime()
+              : null,
       });
     $("map-point").hidden = true;
   };
@@ -799,9 +594,6 @@ export function createRadar({
   async function refreshActive() {
     if (!document.hidden && document.body.dataset.screen === "map") {
       if (fieldLayer(kind)) weatherMaps.updateLabels();
-      if (kind === "radar" && current > 0)
-        $("radar-age").textContent =
-          `${Math.max(0, Math.round((Date.now() / 1000 - current) / 60))} min old`;
       if (!navigator.onLine) status("Offline · displayed map data is saved");
       if (kind === "warnings") {
         trackingFeatures = trackingFeatures.filter(
@@ -830,13 +622,7 @@ export function createRadar({
         return;
       }
       if (kind === "radar") {
-        if (
-          radarFailed ||
-          !frames.length ||
-          Date.now() - lastRadarFetch >= 300000
-        )
-          await fetchRadar(radarFailed, true);
-        else if (current) frameCaption({ time: current });
+        await timeline.refresh();
       } else if (
         kind === "warnings" &&
         (warningFailed ||
@@ -861,7 +647,7 @@ export function createRadar({
     if (fieldLayer(kind)) void weatherMaps.activate(kind);
     else void refreshActive();
   }
-  setInterval(refreshActive, 30000);
+  setInterval(refreshActive, 1000);
   addEventListener("online", () => {
     if (document.body.dataset.screen === "map") enter();
   });
@@ -882,6 +668,12 @@ export function createRadar({
   return {
     enter,
     setPlace() {
+      timeline.deactivate();
+      if (kind === "radar") {
+        $("radar-time").textContent = "Checking source times…";
+        delete $("radar-time").dataset.validAt;
+        delete $("radar-time").dataset.frameType;
+      }
       if (map) {
         const p = getPlace();
         marker.setLatLng([p.latitude, p.longitude]);
@@ -890,6 +682,8 @@ export function createRadar({
           fieldLayer(kind) ? Math.min(map.getZoom(), 5) : 7,
         );
       }
+      if (map && kind === "radar" && document.body.dataset.screen === "map")
+        void timeline.refresh();
     },
   };
 }

@@ -14,6 +14,7 @@ export class RefreshResource {
     online = () => globalThis.navigator?.onLine !== false,
     visible = () => typeof document === "undefined" || !document.hidden,
     retryBase = 30000,
+    respectExpiry = true,
   }) {
     Object.assign(this, {
       key,
@@ -29,6 +30,7 @@ export class RefreshResource {
       online,
       visible,
       retryBase,
+      respectExpiry,
     });
     this.entry = null;
     this.error = null;
@@ -89,7 +91,10 @@ export class RefreshResource {
     return (
       !this.snapshot().data ||
       this.now() >=
-        Math.max(this.entry.at + this.interval(), this.entry.expiresAt || 0)
+        Math.max(
+          this.entry.at + this.interval(),
+          this.respectExpiry ? this.entry.expiresAt || 0 : 0,
+        )
     );
   }
   refresh({ force = false } = {}) {

@@ -1,3 +1,4 @@
+import { createForecastStrip } from "./forecast-strip.js";
 import { createEnvironment } from "./environment.js";
 import { $, store, node, json, condition, weatherIcon } from "./api.js";
 import { initUI, sheet } from "./ui.js";
@@ -361,12 +362,12 @@ function renderForecast() {
       "aria-label",
       `${day(h.time[i])} ${time(h.time[i])}, ${formatMetric(metricValue(i))}`,
     );
-    b.onclick = () => selectHour(j);
+    b.onclick = () => selectHour(j, { smooth: true });
     $("hours").append(b);
   }
   selectHour(selected);
 }
-function selectHour(index) {
+function selectHour(index, { align = true, smooth = false } = {}) {
   if (!data) return;
   selected = index;
   const h = data.hourly,
@@ -397,14 +398,11 @@ function selectHour(index) {
     cursor.setAttribute("x1", x);
     cursor.setAttribute("x2", x);
   }
-  document
-    .querySelectorAll(".hour")
-    .forEach((n) =>
-      n.setAttribute(
-        "aria-pressed",
-        String(Number(n.dataset.index) === selected),
-      ),
-    );
+  const previous = $("hours").querySelector('[aria-pressed="true"]');
+  if (previous) previous.setAttribute("aria-pressed", "false");
+  const chosen = $("hours").querySelector(`[data-index="${selected}"]`);
+  chosen?.setAttribute("aria-pressed", "true");
+  if (align) forecastStrip.sync(selected, { smooth });
   const detail = $("hour-detail");
   detail.replaceChildren();
   [
@@ -880,6 +878,20 @@ function refreshLabels() {
 function acceptForecast(state) {
   sourceStates.forecast = state;
   if (state.data && state.data !== data) {
+    const unchanged =
+      data &&
+      JSON.stringify([data.current, data.hourly, data.daily, data.timezone]) ===
+        JSON.stringify([
+          state.data.current,
+          state.data.hourly,
+          state.data.daily,
+          state.data.timezone,
+        ]);
+    if (unchanged) {
+      data = state.data;
+      refreshLabels();
+      return;
+    }
     const previous = selectedTime;
     data = state.data;
     selected = selectionAfterRefresh(
@@ -996,12 +1008,13 @@ function load(p, force = false) {
   });
   add("forecast", {
     key: `truecast-forecast-v3-${id}`,
-    ttl: 600000,
+    ttl: 10000,
+    respectExpiry: false,
     maxAge: 86400000,
     loader: ({ signal }) =>
       json(`https://api.open-meteo.com/v1/forecast?${params}`, {
         signal,
-        metadata: true,
+        metadata: false,
         cache: "no-cache",
       }),
     validate: validForecast,
@@ -1011,12 +1024,13 @@ function load(p, force = false) {
   });
   add("air", {
     key: `truecast-air-v4-${id}`,
-    ttl: 900000,
+    ttl: 10000,
+    respectExpiry: false,
     maxAge: 3600000,
     loader: ({ signal }) =>
       json(
         `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${p.latitude}&longitude=${p.longitude}&current=us_aqi,pm2_5,pm10,ozone&timeformat=unixtime&timezone=auto`,
-        { signal, metadata: true, cache: "no-cache" },
+        { signal, metadata: false, cache: "no-cache" },
       ),
     validate: (d) => d?.current && Number.isFinite(d.current.time),
     validAt: (d) => d.current.time * 1000,
@@ -1035,8 +1049,8 @@ function load(p, force = false) {
   });
   add("alerts", {
     key: `truecast-alerts-v4-${id}`,
-    ttl: (d) =>
-      d?.unsupported ? 21600000 : d?.features?.length ? 60000 : 120000,
+    ttl: (d) => (d?.unsupported ? 21600000 : 10000),
+    respectExpiry: false,
     maxAge: 1800000,
     loader: async ({ signal }) => {
       const point = await nwsPoint(p, { signal });
@@ -1093,7 +1107,7 @@ function showFreshness() {
   content.append(
     node(
       "p",
-      "While open: forecasts check every 10 minutes, air quality every 15, and US alerts every 1–2. Returning after two minutes prompts a forecast check; reconnecting checks all sources. Failures retain labeled saved data with retry delays. Forecasts older than 24 hours and air quality older than one hour are not shown.",
+      "While open: weather, air quality, and supported US alerts are checked about every 10 seconds. Source data is published on its own schedule. Returning after two minutes prompts a forecast check; reconnecting checks all sources. Failures retain labeled saved data with retry delays. Forecasts older than 24 hours and air quality older than one hour are not shown.",
       "fine",
     ),
   );
@@ -1287,7 +1301,7 @@ addEventListener("focus", () => wakeSources());
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) wakeSources();
 });
-setInterval(tickSources, 15000);
+setInterval(tickSources, 1000);
 const environment = createEnvironment({
   getPlace: () => place,
   present: (title, content) => {
@@ -1308,6 +1322,11 @@ const officialSources = sourceTools({
 $("source-freshness").onclick = showFreshness;
 $("official-outlook").onclick = officialSources.outlook;
 $("station-observation").onclick = officialSources.observation;
+const forecastStrip = createForecastStrip({
+  rail: $("hours"),
+  getSelected: () => selected,
+  onSelect: (index) => selectHour(index, { align: false }),
+});
 savedPlaces();
 load(place);
 if (document.body.dataset.screen === "map") radar.enter();

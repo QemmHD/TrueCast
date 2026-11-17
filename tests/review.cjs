@@ -146,9 +146,13 @@ if (process.env.TRUECAST_BROWSER_PATH)
       n.dispatchEvent(new Event("input"));
     });
     assert.equal(await page.locator("#opacity-value").innerText(), "40%");
-    await page.locator("#coverage").check();
+    assert.equal(await page.locator("#coverage").isDisabled(), true);
     await page.locator("#close-map-dialog").click();
-    assert.ok(Number(await page.locator("#frame").getAttribute("max")) <= 4);
+    await page.locator("[data-radar-window=past]").click();
+    const pastWindow = await page
+      .locator("#frame")
+      .evaluate((n) => Number(n.max) - Number(n.min));
+    assert.ok(pastWindow <= 30 * 60000, "selected history exceeds 30 minutes");
     await page.locator("#speed").click();
     assert.equal(await page.locator("#speed").innerText(), "2×");
     await page.locator("#play").click();
@@ -162,7 +166,7 @@ if (process.env.TRUECAST_BROWSER_PATH)
       "Play radar animation",
     );
     console.log(
-      "PASS real past radar, shortened history, opacity, coverage mask, speed and pause on exit",
+      "PASS real past radar, shortened history, opacity, coverage availability, speed and pause on exit",
     );
     // Synthetic source fixtures are used only in tests. Nothing is shipped as sample weather.
     const warning = {

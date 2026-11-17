@@ -286,3 +286,22 @@ test("HTTP adapter parses numeric/date Retry-After and cache metadata, and forwa
   );
   assert.equal(capturedSignal.aborted, true);
 });
+test("foreground policy revalidates after ten seconds even with a later HTTP expiry", async () => {
+  let calls = 0;
+  const h = harness({
+    ttl: 10000,
+    maxAge: 100000,
+    respectExpiry: false,
+    loader: async () => {
+      calls++;
+      return { body: { value: 2 }, expiresAt: 2000000 };
+    },
+  });
+  await h.r.refresh();
+  h.advance(9999);
+  await h.r.refresh();
+  assert.equal(calls, 1);
+  h.advance(1);
+  await h.r.refresh();
+  assert.equal(calls, 2);
+});

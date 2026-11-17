@@ -15,6 +15,8 @@ const SHELL = [
   "weather-maps.js",
   "environment.js",
   "radar.js",
+  "radar-timeline.js",
+  "forecast-strip.js",
   "ui.js",
   "install.js",
   "manifest.webmanifest",

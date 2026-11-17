@@ -624,9 +624,9 @@ body[data-map-layer="satellite"] .leaflet-control-attribution {
 @media (max-height: 500px) {
   .weather-console {
     left: auto;
-    right: 12px;
+    right: max(12px, var(--safe-right));
     max-width: 390px;
-    width: 47%;
+    width: calc((100% - var(--safe-left) - var(--safe-right)) * 0.47);
     padding: 10px 12px;
   }
   .forecast-products {
@@ -918,11 +918,131 @@ body[data-weather="cloudy"] .sky-noise {
 }
 @media (max-height: 500px) {
   .map-top {
-    left: 12px;
+    left: max(12px, var(--safe-left));
     right: auto;
-    width: 44%;
+    width: calc((100% - var(--safe-left) - var(--safe-right)) * 0.44);
   }
   .map-screen .leaflet-control-attribution {
     max-width: calc(43vw - 80px) !important;
+  }
+}
+.radar-window {
+  display: flex;
+  gap: 3px;
+  background: #081326b8;
+  border-radius: 9px;
+  padding: 3px;
+  margin-bottom: 10px;
+}
+.radar-window button {
+  min-height: 29px;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 5px 10px;
+  color: #9eb5d4;
+  font-size: 10px;
+  border-radius: 6px;
+}
+.radar-window button[aria-pressed="true"] {
+  background: #304c73;
+  color: #edf5ff;
+}
+.radar-range-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.radar-range-track input {
+  display: block;
+  width: 100%;
+  margin: 0;
+  height: 28px;
+}
+.radar-range-track > i {
+  position: absolute;
+  top: -9px;
+  transform: translateX(-50%);
+  font-size: 6px;
+  font-style: normal;
+  letter-spacing: 0.6px;
+  color: #e3d6ff;
+  pointer-events: none;
+  z-index: 2;
+}
+.radar-range-track > i:after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 1px;
+  height: 13px;
+  top: 9px;
+  background: #dccbff69;
+}
+#radar-console[data-frame-type="forecast"] {
+  border-color: #c1b5ff45;
+}
+#radar-console[data-frame-type="forecast"] #radar-time-kind {
+  color: #cfbfff;
+}
+#radar-availability,
+#radar-blend-note {
+  font-size: 8px;
+  color: #a5bad7;
+  line-height: 1.4;
+  margin: 7px 0 0;
+}
+.leaflet-weather-pane > .leaflet-layer {
+  will-change: opacity;
+}
+#hours {
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+}
+.hour {
+  scroll-snap-align: center;
+}
+body[data-map-layer="radar"] .map-point {
+  bottom: 285px;
+}
+body[data-map-layer="radar"] .leaflet-control-attribution {
+  margin-bottom: 280px !important;
+}
+@media (max-height: 500px) {
+  body[data-map-layer="radar"] .radar-console {
+    left: auto;
+    right: max(12px, var(--safe-right));
+    width: calc((100% - var(--safe-left) - var(--safe-right)) * 0.47);
+    max-width: 390px;
+    margin: 0;
+    padding: 10px 12px;
+  }
+  #radar-availability,
+  #radar-blend-note {
+    font-size: 7px;
+    margin-top: 4px;
+  }
+  .radar-window {
+    margin-bottom: 6px;
+  }
+  .radar-window button {
+    min-height: 25px;
+  }
+  .radar-console .radar-legend {
+    display: none;
+  }
+  body[data-map-layer="radar"] .map-point {
+    bottom: 65px;
+  }
+  body[data-map-layer="radar"] .leaflet-control-attribution {
+    margin-bottom: 8px !important;
+  }
+}
+@media (max-width: 760px) and (max-height: 740px) {
+  body[data-map-layer="radar"] .map-floats {
+    display: grid;
+    grid-template-columns: repeat(2, 38px);
+    gap: 6px;
+    top: 106px;
   }
 }

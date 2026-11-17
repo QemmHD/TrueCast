@@ -490,6 +490,17 @@
           <p class="map-source" id="weather-source"></p>
         </div>
         <div class="radar-console" id="radar-console">
+          <div
+            class="radar-window"
+            id="radar-window"
+            aria-label="Radar timeline range"
+          >
+            <button data-radar-window="both" aria-pressed="true">Both</button
+            ><button data-radar-window="past" aria-pressed="false">Past</button
+            ><button data-radar-window="future" aria-pressed="false">
+              Future
+            </button>
+          </div>
           <div class="radar-console-top">
             <span
               ><small id="radar-time-kind">OBSERVED RADAR</small
@@ -497,18 +508,22 @@
             ><button id="radar-latest">Latest ↺</button>
           </div>
           <div id="radar-playback">
-            <div class="playback-row">
+            <div class="playback-row radar-scrub-row">
               <button aria-label="Play radar animation" disabled="" id="play">
                 <span aria-hidden="true" class="play-icon"></span></button
-              ><label class="sr-only" for="frame">Radar frame</label
-              ><input
-                disabled=""
-                id="frame"
-                max="0"
-                min="0"
-                type="range"
-                value="0"
-              /><button aria-label="Change radar playback speed" id="speed">
+              ><label class="sr-only" for="frame">Radar frame</label>
+              <div class="radar-range-track">
+                <i id="radar-now-marker">NOW</i
+                ><input
+                  disabled=""
+                  id="frame"
+                  max="0"
+                  min="0"
+                  type="range"
+                  value="0"
+                />
+              </div>
+              <button aria-label="Change radar playback speed" id="speed">
                 1×
               </button>
             </div>
@@ -517,10 +532,12 @@
               ><span id="radar-end">LATEST</span>
             </div>
             <div class="radar-legend">
-              <span>LIGHT</span><i></i><span>HEAVY</span
-              ><span id="radar-age"></span>
+              <span id="radar-variable">REFLECTIVITY</span><i></i
+              ><span>HEAVY</span><span id="radar-age"></span>
             </div>
           </div>
+          <p id="radar-availability" class="map-source"></p>
+          <p id="radar-blend-note" class="map-source"></p>
           <div hidden="" id="tracking-summary">
             <p id="tracking-text">Loading official data…</p>
             <div class="tracking-actions">
@@ -609,7 +626,7 @@
             <h2>TrueCast</h2>
             <p id="app-install-status">Your daily weather companion.</p>
           </div>
-          <span class="version-pill">4.0</span>
+          <span class="version-pill">4.1</span>
         </div>
         <div class="surface settings-group">
           <h3>Make it yours</h3>
@@ -667,7 +684,10 @@
             Atlantic and eastern/central Pacific products. Lightning density is
             a regional observed grid, not individual strike tracking. Future
             maps are model forecasts; minute-specific rain arrival is not
-            included.
+            included. Radar defaults to both history and forecast: a six-hour
+            window each in US coverage. Elsewhere, history is limited by the
+            available feed. Future reflectivity is model-simulated; smooth
+            blending does not add source frames.
           </p>
           <p class="fine">
             Weather requests send the selected coordinates to the providers.
@@ -694,6 +714,20 @@
               <a href="https://rainviewer.com/" rel="noopener" target="_blank"
                 >RainViewer</a
               >
+              · US radar / future reflectivity:
+              <a
+                href="https://nowcoast.noaa.gov/"
+                rel="noopener"
+                target="_blank"
+                >NOAA MRMS</a
+              >
+              /
+              <a
+                href="https://mesonet.agron.iastate.edu/GIS/model.phtml"
+                rel="noopener"
+                target="_blank"
+                >HRRR via Iowa Environmental Mesonet</a
+              >
               · Future maps:
               <a
                 href="https://www.dwd.de/EN/ourservices/geoservices/geodienste.html"
@@ -717,8 +751,8 @@
               Personal, noncommercial edition. Saved places and preferences stay
               in this browser. Coordinates are sent to weather providers when
               you request a forecast. Maps request imagery from OpenStreetMap,
-              RainViewer, DWD and NOAA when opened. Air and pollen requests use
-              CAMS via Open-Meteo.
+              RainViewer, DWD, NOAA and Iowa Environmental Mesonet when opened.
+              Air and pollen requests use CAMS via Open-Meteo.
             </p>
           </footer>
         </details>
@@ -841,6 +875,8 @@
       ><label class="setting-row" for="loop-length"
         ><span>Radar history</span
         ><select id="loop-length">
+          <option value="360" selected>6 hours</option>
+          <option value="180">3 hours</option>
           <option value="120">2 hours</option>
           <option value="60">1 hour</option>
           <option value="30">30 minutes</option>

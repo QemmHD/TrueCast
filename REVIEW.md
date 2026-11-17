@@ -1,3 +1,16 @@
+# TrueCast Atmosphere 4.1 review
+
+17 November 2026. Current source details and behavior: [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md). Earlier release records below are historical.
+
+- Seventeen unit scenarios cover native radar timestamps, explicit/fresh HRRR runs, observed/future window boundaries, ten-second foreground revalidation, cache expiry, backoff, DST and missing data.
+- The new playback browser suite checks the default six-hour history/future bar, explicit run tile URLs, intermediate blended opacity, four-layer cache bounds, continued playback/time advancement through zoom, failed tiles retaining the verified image/time, proportional chart/strip scrolling in both directions and unchanged cards after repeated weather checks.
+- Switching US to global coverage discards US frames, labels limited RainViewer history and reports unavailable future data. Review caught and fixed removed Leaflet layers retaining map listeners; subsequent zoom and location changes pass without uncaught errors.
+- Existing suites exercise fresh/offline/hidden recovery, independent official sources, alerts and storm tracks, future map products, air/pollen, five viewport widths, saved preferences and actual 21-file service-worker upgrades.
+- Live NOAA MRMS and explicitly pinned IEM HRRR tiles loaded. Phone screenshots and an 852×393 landscape layout were inspected, including safe-area placement and non-overlap of the layer controls and timeline.
+- Ten-second checks run while visible and obey retry delays. Source valid times remain distinct from fetch times. Frame blending smooths native imagery without claiming optical-flow storm predictions. Six-hour history/future coverage is US-focused; global history is shorter.
+
+---
+
 # TrueCast Atmosphere 4.0 review
 
 16 November 2026. Current release details and primary sources: [ATMOSPHERE-RELEASE.md](ATMOSPHERE-RELEASE.md). Earlier reviews below are historical.

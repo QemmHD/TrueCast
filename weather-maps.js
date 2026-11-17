@@ -226,6 +226,8 @@ export function createWeatherMaps({
     controller,
     timer,
     playing = false,
+    moving = false,
+    playingTask = false,
     playTimer,
     refreshing = false,
     retryAt = 0,
@@ -526,6 +528,31 @@ export function createWeatherMaps({
       return false;
     }
     const previous = overlay;
+    if (
+      previous &&
+      !moving &&
+      !matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      const start = performance.now();
+      await new Promise((resolve) => {
+        const blend = (at) => {
+          if (own !== requestToken || !isActive() || document.hidden) {
+            resolve();
+            return;
+          }
+          const progress = Math.min(1, (at - start) / 350);
+          image.setOpacity(getOpacity() * progress);
+          previous.setOpacity(getOpacity() * (1 - progress));
+          if (progress < 1) requestAnimationFrame(blend);
+          else resolve();
+        };
+        requestAnimationFrame(blend);
+      });
+    }
+    if (own !== requestToken || !isActive()) {
+      remove(image);
+      return false;
+    }
     overlay = image;
     overlay.setOpacity(getOpacity());
     remove(previous);
@@ -617,7 +644,9 @@ export function createWeatherMaps({
     }
   }
   function requestView() {
+    moving = false;
     clearTimeout(timer);
+    if (playing) return;
     if (refreshing) {
       viewQueued = true;
       return;
@@ -628,15 +657,24 @@ export function createWeatherMaps({
       }, 400);
   }
   async function play() {
-    if (!playing || !isActive() || document.hidden) return;
-    const ok = await show((requestedIndex + 1) % times.length);
-    if (ok && playing) playTimer = setTimeout(play, 1200);
-    else stop();
+    if (!playing || !isActive() || document.hidden || playingTask) return;
+    if (moving || refreshing) {
+      playTimer = setTimeout(play, 150);
+      return;
+    }
+    playingTask = true;
+    try {
+      await show((requestedIndex + 1) % times.length);
+    } finally {
+      playingTask = false;
+    }
+    if (playing) playTimer = setTimeout(play, 850);
   }
   $("weather-frame").oninput = () => {
     stop();
     clearTimeout(timer);
-    timer = setTimeout(() => show(Number($("weather-frame").value)), 160);
+    const index = Number($("weather-frame").value);
+    timer = setTimeout(() => show(index), 160);
   };
   $("weather-play").onclick = () => {
     if (playing) stop();
@@ -731,6 +769,9 @@ export function createWeatherMaps({
   });
   return {
     activate,
+    beginMove: () => {
+      moving = true;
+    },
     hide,
     stop,
     requestView,
