@@ -617,6 +617,7 @@ export function createRadar({
   async function refreshActive() {
     if (!document.hidden && document.body.dataset.screen === "map") {
       if (fieldLayer(kind)) weatherMaps.updateLabels();
+      atlas.updateLabels();
       if (!navigator.onLine) status("Offline · displayed map data is saved");
       if (kind === "warnings") {
         trackingFeatures = trackingFeatures.filter(

@@ -121,3 +121,10 @@ export function weatherIcon(code, day = true) {
   svg.innerHTML += art;
   return svg;
 }
+
+export function reducedMotion() {
+  return (
+    document.body?.dataset.motion === "reduced" ||
+    matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}

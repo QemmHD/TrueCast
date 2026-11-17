@@ -1,3 +1,4 @@
+import { reducedMotion } from "./api.js";
 // Keep the selected hour visible without scrolling the page or chasing a drag.
 export function createForecastStrip({ rail, onSelect, getSelected }) {
   let gesture = false,
@@ -14,10 +15,7 @@ export function createForecastStrip({ rail, onSelect, getSelected }) {
     programTarget = left;
     rail.scrollTo({
       left,
-      behavior:
-        smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "smooth"
-          : "auto",
+      behavior: smooth && !reducedMotion() ? "smooth" : "auto",
     });
   }
   function userStart() {

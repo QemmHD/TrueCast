@@ -1,3 +1,11 @@
+import { drawForecastChart } from "./forecast-chart.js";
+import {
+  forecastSignals,
+  rankWindows,
+  ACTIVITY_LIMITS,
+  windowCalendar,
+  modelTemperatureSpread,
+} from "./weather-intelligence.js";
 import { createConditions } from "./conditions.js";
 import { createForecastStrip } from "./forecast-strip.js";
 import { createEnvironment } from "./environment.js";
@@ -41,7 +49,8 @@ let data,
   metric = "temperature",
   selected = 0,
   detailType = "",
-  alertViewSignature = "";
+  alertViewSignature = "",
+  forecastPlot;
 const temp = (n) =>
   Number.isFinite(n) ? `${Math.round(unit === "F" ? n * 1.8 + 32 : n)}°` : "—";
 const wind = (n) =>
@@ -158,7 +167,7 @@ function render() {
   $("measurements").value = measurements;
   $("place").textContent = place.name;
   $("date").textContent =
-    `${day(Date.now() / 1000)} · ${data.timezone.replaceAll("_", " ")}`;
+    `${day(Date.now() / 1000)} · ${time(Date.now() / 1000)}`;
   $("temperature").textContent = temp(c.temperature_2m);
   $("condition").textContent = condition(c.weather_code);
   $("feels").textContent = temp(c.apparent_temperature);
@@ -210,10 +219,11 @@ function render() {
         i > begin &&
         i < begin + 18 &&
         p >= 40 &&
-        p >= (h.precipitation_probability[begin] || 0) + 20,
+        (!Number.isFinite(h.precipitation_probability[begin]) ||
+          p >= h.precipitation_probability[begin] + 20),
     );
     if (next >= 0)
-      change = `Rain chance rises to ${number(h.precipitation_probability[next], "%")} around ${time(h.time[next])}.`;
+      change = `Rain chance ${Number.isFinite(h.precipitation_probability[begin]) ? "rises to" : "reaches"} ${number(h.precipitation_probability[next], "%")} around ${time(h.time[next])}.`;
     else {
       const next = h.weather_code.findIndex(
         (code, i) =>
@@ -228,6 +238,8 @@ function render() {
     }
   }
   $("change-brief").textContent = change;
+  renderSignals();
+  syncHomeFocus();
   $("forecast-story").textContent = change;
   const sunrise = d.sunrise[k],
     sunset = d.sunset[k],
@@ -258,6 +270,71 @@ function render() {
   // Open sheets keep their scroll position during background updates.
   renderedStart = start();
   renderedDay = todayIndex();
+}
+function syncHomeFocus() {
+  const storm = document.body.dataset.homeFocus === "storm";
+  const outlook = $("hero-outlook"),
+    mapLink = $("hero-future-map");
+  outlook.querySelector(":scope > span").textContent = storm
+    ? "Stormwatch"
+    : "Extended outlook";
+  $("hero-outlook-days").textContent = storm
+    ? "Observed radar"
+    : `${data?.daily.time.length || 16} days`;
+  outlook.href = storm ? "#map" : "#forecast";
+  mapLink.querySelector(":scope > span").textContent = storm
+    ? "Local lightning"
+    : "Explore the atmosphere";
+  const b = mapLink.querySelector("b");
+  if (b.firstChild?.nodeType === Node.TEXT_NODE)
+    b.firstChild.textContent = storm ? "Open lightning " : "Future maps ";
+}
+addEventListener("truecast:home-focus", syncHomeFocus);
+function renderSignals() {
+  if (!data) return;
+  const items = forecastSignals(data),
+    rail = $("weather-signals");
+  rail.replaceChildren();
+  for (const item of items) {
+    const b = node("button", null, "weather-signal");
+    b.dataset.signal = item.kind;
+    const value =
+      item.kind === "rain"
+        ? number(item.value, "%")
+        : item.kind === "wind"
+          ? wind(item.value)
+          : item.kind === "temperature"
+            ? temp(item.value)
+            : time(item.time);
+    const sameDay = day(item.time) === day(Date.now() / 1000);
+    const at = sameDay
+      ? time(item.time)
+      : `${new Intl.DateTimeFormat("en", { weekday: "short", timeZone: data.timezone }).format(new Date(item.time * 1000))} ${time(item.time)}`;
+    b.append(
+      node("small", item.label),
+      node("strong", value),
+      node(
+        "span",
+        item.kind === "sun" ? "Next sun event" : `${at} · ${item.detail}`,
+      ),
+    );
+    b.onclick = () => {
+      selected = Math.max(
+        0,
+        data.hourly.time.findIndex((t) => t >= item.time) - start(),
+      );
+      metric =
+        item.kind === "rain"
+          ? "rain"
+          : item.kind === "wind"
+            ? "wind"
+            : "temperature";
+      renderForecast();
+      document.querySelector('[data-forecast-view="hourly"]').click();
+      location.hash = "forecast";
+    };
+    rail.append(b);
+  }
 }
 function uvLabel(n) {
   return !Number.isFinite(n)
@@ -290,76 +367,25 @@ function renderForecast() {
   $("forecast-scrub").value = selected;
   $("forecast-scrub").disabled = count === 0;
   const chart = $("forecast-chart");
-  chart.replaceChildren();
   const values = Array.from({ length: count }, (_, i) =>
-      metricValue(begin + i),
-    ),
-    valid = values.filter(Number.isFinite);
-  if (valid.length) {
-    const low = metric === "temperature" ? Math.min(...valid) - 1 : 0,
-      high = Math.max(...valid) + 0.1,
-      span = Math.max(1, high - low),
-      ns = "http://www.w3.org/2000/svg",
-      svg = document.createElementNS(ns, "svg");
-    svg.setAttribute("viewBox", "0 0 600 180");
-    svg.setAttribute("role", "img");
-    svg.setAttribute(
-      "aria-label",
-      `${metric} forecast. Select an hourly entry for exact values.`,
-    );
-    svg.classList.add(`chart-${metric}`);
-    for (let j = 0; j < 4; j++) {
-      const line = document.createElementNS(ns, "line");
-      line.setAttribute("x1", "6");
-      line.setAttribute("x2", "594");
-      line.setAttribute("y1", 20 + j * 42);
-      line.setAttribute("y2", 20 + j * 42);
-      line.setAttribute("class", "chart-grid");
-      svg.append(line);
-    }
-    let path = "",
-      gap = true;
-    values.forEach((v, i) => {
-      if (!Number.isFinite(v)) {
-        gap = true;
-        return;
-      }
-      const x = 8 + (i / Math.max(1, count - 1)) * 584,
-        y = 151 - ((v - low) / span) * 125;
-      path += `${gap ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)} `;
-      gap = false;
-    });
-    const line = document.createElementNS(ns, "path");
-    line.setAttribute("d", path);
-    line.setAttribute("class", "chart-line");
-    svg.append(line);
-    const cursor = document.createElementNS(ns, "line");
-    cursor.id = "chart-cursor";
-    cursor.setAttribute("y1", "10");
-    cursor.setAttribute("y2", "165");
-    cursor.setAttribute("class", "chart-cursor");
-    svg.append(cursor);
-    chart.prepend(
-      node(
-        "div",
-        `${metric === "temperature" ? "Temperature" : metric === "rain" ? "Hourly precipitation (hour ending at time shown)" : "Wind speed"} · ${metric === "temperature" ? (unit === "F" ? "°F" : "°C") : metric === "rain" ? (measurements === "imperial" ? "in" : "mm") : measurements === "imperial" ? "mph" : "km/h"}`,
-        "chart-unit",
-      ),
-    );
-    chart.append(svg);
-    const axis = node("div", null, "chart-axis");
-    [0, Math.floor((count - 1) / 2), count - 1].forEach((i) =>
-      axis.append(
-        node(
-          "span",
-          Number($("horizon").value) > 24
-            ? `${day(h.time[begin + i])} ${time(h.time[begin + i])}`
-            : time(h.time[begin + i]),
-        ),
-      ),
-    );
-    chart.append(axis);
-  } else chart.append(node("p", "No hourly forecast available.", "fine"));
+    metricValue(begin + i),
+  );
+  forecastPlot = drawForecastChart({
+    target: chart,
+    values,
+    times: h.time.slice(begin, begin + count),
+    isDay: h.is_day.slice(begin, begin + count),
+    metric,
+    secondary:
+      metric === "wind" ? h.wind_gusts_10m.slice(begin, begin + count) : [],
+    format: formatMetric,
+    formatTime: (t) =>
+      Number($("horizon").value) > 24
+        ? `${new Intl.DateTimeFormat("en", { weekday: "short", timeZone: data.timezone }).format(new Date(t * 1000))} ${time(t)}`
+        : time(t),
+    unit: `${metric === "temperature" ? "Temperature" : metric === "rain" ? "Hourly precipitation (hour ending at time shown)" : "Wind speed"} · ${metric === "temperature" ? (unit === "F" ? "°F" : "°C") : metric === "rain" ? (measurements === "imperial" ? "in" : "mm") : measurements === "imperial" ? "mph" : "km/h"}`,
+    onSelect: (index) => selectHour(index),
+  });
   $("hours").replaceChildren();
   for (let j = 0; j < count; j++) {
     const i = begin + j,
@@ -368,12 +394,12 @@ function renderForecast() {
     b.append(
       node("small", time(h.time[i]).replace(":00", "")),
       weatherIcon(h.weather_code[i], h.is_day[i] === 1),
-      node("strong", formatMetric(metricValue(i))),
+      node("strong", temp(h.temperature_2m[i])),
       node("small", number(h.precipitation_probability[i], "%"), "rain-chance"),
     );
     b.setAttribute(
       "aria-label",
-      `${day(h.time[i])} ${time(h.time[i])}, ${formatMetric(metricValue(i))}`,
+      `${day(h.time[i])} ${time(h.time[i])}, ${temp(h.temperature_2m[i])}, ${number(h.precipitation_probability[i], "% rain chance")}`,
     );
     b.onclick = () => selectHour(j, { smooth: true });
     $("hours").append(b);
@@ -404,13 +430,7 @@ function selectHour(index, { align = true, smooth = false } = {}) {
   $("selected-value").textContent = formatMetric(metricValue(i));
   $("selected-condition").textContent = condition(h.weather_code[i]);
   $("forecast-scrub").value = selected;
-  const cursor = $("chart-cursor");
-  if (cursor) {
-    const x =
-      8 + (selected / Math.max(1, Number($("forecast-scrub").max))) * 584;
-    cursor.setAttribute("x1", x);
-    cursor.setAttribute("x2", x);
-  }
+  forecastPlot?.setSelected(selected);
   const previous = $("hours").querySelector('[aria-pressed="true"]');
   if (previous) previous.setAttribute("aria-pressed", "false");
   const chosen = $("hours").querySelector(`[data-index="${selected}"]`);
@@ -419,7 +439,10 @@ function selectHour(index, { align = true, smooth = false } = {}) {
   const detail = $("hour-detail");
   detail.replaceChildren();
   [
+    ["Temperature", temp(h.temperature_2m[i])],
     ["Feels like", temp(h.apparent_temperature[i])],
+    ["Precipitation", rain(h.precipitation[i])],
+    ["Wind", wind(h.wind_speed_10m[i])],
     ["Rain chance", number(h.precipitation_probability[i], "%")],
     ["Wind gusts", wind(h.wind_gusts_10m[i])],
     ["Humidity", number(h.relative_humidity_2m[i], "%")],
@@ -677,73 +700,89 @@ function showDetail(type) {
 }
 function renderPlan() {
   if (!data) return;
-  const limits = {
-      walk: [8, 28, 28],
-      run: [5, 23, 24],
-      cycle: [8, 28, 20],
-      picnic: [16, 29, 18],
-    }[$("activity").value],
+  const activity = $("activity").value,
     duration = Number($("duration").value),
-    h = data.hourly,
-    matches = [];
-  let lastEnd = -1;
-  for (
-    let i = start();
-    i < Math.min(start() + 72, h.time.length - duration + 1);
-    i++
-  ) {
-    if (i < lastEnd) continue;
-    let ok = true;
-    for (let j = i; j < i + duration; j++)
-      if (!(
-        h.is_day[j] === 1 &&
-        Number.isFinite(h.temperature_2m[j]) &&
-        h.temperature_2m[j] >= limits[0] &&
-        h.temperature_2m[j] <= limits[1] &&
-        Number.isFinite(h.precipitation_probability[j]) &&
-        h.precipitation_probability[j] <= 25 &&
-        Number.isFinite(h.precipitation[j]) &&
-        h.precipitation[j] <= 0.1 &&
-        Number.isFinite(h.wind_speed_10m[j]) &&
-        h.wind_speed_10m[j] <= limits[2] &&
-        h.weather_code[j] < 95
-      ))
-        ok = false;
-    if (ok) {
-      matches.push(i);
-      lastEnd = i + duration + 1;
-      if (matches.length === 3) break;
-    }
-  }
+    priority = $("plan-priority").value,
+    limits = ACTIVITY_LIMITS[activity];
+  const windows = rankWindows(data, { activity, duration, priority });
+  store.set("truecast-plan", { activity, duration, priority });
   $("window").replaceChildren();
   $("other-windows").replaceChildren();
   $("plan-criteria").textContent =
-    `${duration} consecutive daylight hour${duration === 1 ? "" : "s"}; temperature ${temp(limits[0])}–${temp(limits[1])}; wind no more than ${wind(limits[2])}; rain chance at most 25%; accumulation at most ${rain(0.1)} per hour. We search the next 72 hours and show the first non-overlapping matches.`;
-  if (!matches.length) {
+    `${duration} consecutive daylight hour${duration === 1 ? "" : "s"}; temperature ${temp(limits[0])}–${temp(limits[1])}; wind no more than ${wind(limits[2])}; gusts no more than ${wind(limits[2] * 1.7)}; rain chance at most 25%; accumulation at most ${rain(0.1)} per hour. We search the next 72 hours and rank non-overlapping matches by ${priority === "earliest" ? "earliest start" : priority === "calm" ? "calmer wind, rain chance and comfortable temperature" : "comfortable temperature, lower wind and lower rain chance"}. These are model-based preferences, not a calibrated safety or confidence score.`;
+  if (!windows.length) {
     $("window").append(
       node("span", "NO MATCHING WINDOW", "eyebrow"),
-      node("h2", "Keep an eye on the forecast."),
+      node("h2", "A better window may be ahead."),
       node(
         "p",
-        "No interval matches all your comfort thresholds in the next 72 hours. Try a shorter duration or a different activity.",
+        "No complete interval meets your preferences in the next 72 hours. Try a shorter duration or another activity.",
         "muted",
       ),
     );
     return;
   }
-  matches.forEach((i, j) => {
+  windows.forEach((w, index) => {
     const card =
-      j === 0 ? $("window") : node("div", null, "alternative-window surface");
+        index === 0
+          ? $("window")
+          : node("article", null, "alternative-window surface"),
+      stamp = `${day(w.start)} · ${time(w.start)} – ${time(w.end)}`;
     card.append(
-      node("small", j === 0 ? "YOUR NEXT WINDOW" : day(h.time[i]), "eyebrow"),
-      node("h2", `${time(h.time[i])} – ${time(h.time[i] + duration * 3600)}`),
       node(
-        "p",
-        `${day(h.time[i])} · ${temp(h.temperature_2m[i])} · ${number(h.precipitation_probability[i], "% rain")} · ${wind(h.wind_speed_10m[i])}`,
-        "muted",
+        "small",
+        index === 0
+          ? priority === "earliest"
+            ? "YOUR NEXT WINDOW"
+            : "YOUR BEST FIT"
+          : "ANOTHER GOOD WINDOW",
+        "eyebrow",
       ),
+      node("h2", `${time(w.start)} – ${time(w.end)}`),
+      node("p", day(w.start), "window-day"),
     );
-    if (j > 0) $("other-windows").append(card);
+    const facts = node("div", null, "window-stats");
+    for (const [label, value] of [
+      ["Average", temp(w.meanTemp)],
+      ["Rain chance", number(w.maxRain, "% max")],
+      ["Wind", wind(w.maxWind)],
+      ["Gusts", wind(w.maxGust)],
+    ]) {
+      const cell = node("div");
+      cell.append(node("small", label), node("strong", value));
+      facts.append(cell);
+    }
+    card.append(facts);
+    const actions = node("div", null, "window-actions"),
+      explore = node("button", "Explore these hours"),
+      calendar = node("button", "Add to calendar");
+    explore.onclick = () => {
+      selected = Math.max(0, w.index - start());
+      $("horizon").value = "72";
+      renderForecast();
+      document.querySelector('[data-forecast-view="hourly"]').click();
+      location.hash = "forecast";
+    };
+    calendar.onclick = () => {
+      const text = windowCalendar(
+        w,
+        place,
+        `${stamp}. ${temp(w.meanTemp)} average; rain chance up to ${w.maxRain}%; wind up to ${wind(w.maxWind)}. Source: Open-Meteo via TrueCast.`,
+      );
+      const url = URL.createObjectURL(
+          new Blob([text], { type: "text/calendar;charset=utf-8" }),
+        ),
+        a = node("a");
+      a.href = url;
+      a.download = `TrueCast-${activity}-${new Date(w.start * 1000).toISOString().slice(0, 10)}.ics`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    actions.append(explore, calendar);
+    card.append(actions);
+    if (index) $("other-windows").append(card);
   });
 }
 function renderAir() {
@@ -815,6 +854,32 @@ function updateAlertBadge() {
           ? "US"
           : "!";
   $("show-alerts").dataset.hasAlerts = String(alerts.features.length > 0);
+  const serious = alerts.features
+    .filter(
+      (f) =>
+        ["Extreme", "Severe"].includes(f.properties?.severity) &&
+        Date.parse(f.properties?.expires) > Date.now(),
+    )
+    .sort(
+      (a, b) =>
+        (a.properties.severity === "Extreme" ? 0 : 1) -
+        (b.properties.severity === "Extreme" ? 0 : 1),
+    )[0];
+  $("priority-alert").hidden = !serious;
+  if (serious) {
+    const label =
+      alerts.status === "unverified"
+        ? "SAVED WARNING · UNVERIFIED"
+        : "OFFICIAL WEATHER WARNING";
+    if ($("priority-alert-label").textContent !== label)
+      $("priority-alert-label").textContent = label;
+    if (
+      $("priority-alert-title").textContent !==
+      (serious.properties.event || "Official weather warning")
+    )
+      $("priority-alert-title").textContent =
+        serious.properties.event || "Official weather warning";
+  }
   const signature = JSON.stringify(alerts);
   if (
     $("detail-dialog").open &&
@@ -1189,12 +1254,17 @@ const radar = createRadar({
   },
 });
 $("refresh-weather").onclick = () => load(place, true);
-$("hero-outlook").onclick = () =>
-  document.querySelector('[data-forecast-view="daily"]').click();
+$("hero-outlook").onclick = (e) => {
+  if (document.body.dataset.homeFocus === "storm") {
+    e.preventDefault();
+    openMapLayer("radar");
+  } else document.querySelector('[data-forecast-view="daily"]').click();
+};
 document.querySelector(".weather-brief").onclick = () =>
   document.querySelector('[data-forecast-view="hourly"]').click();
 $("hero-future-map").onclick = () => {
-  window.dispatchEvent(new Event("truecast:future-map"));
+  if (document.body.dataset.homeFocus === "storm") openMapLayer("lightning");
+  else window.dispatchEvent(new Event("truecast:future-map"));
 };
 $("save").onclick = () => {
   const i = saved.findIndex(
@@ -1235,9 +1305,22 @@ document
   .forEach((b) => (b.onclick = () => showDetail(b.dataset.detail)));
 $("all-conditions").onclick = () => showDetail("all");
 $("show-alerts").onclick = () => showDetail("alerts");
+$("priority-alert").onclick = () => showDetail("alerts");
 $("open-warnings").onclick = () => showDetail("alerts");
 $("activity").onchange = renderPlan;
 $("duration").onchange = renderPlan;
+$("plan-priority").onchange = renderPlan;
+const planPreference = store.get("truecast-plan", null);
+if (planPreference) {
+  for (const [id, key] of [
+    ["activity", "activity"],
+    ["duration", "duration"],
+    ["plan-priority", "priority"],
+  ]) {
+    if ([...$(id).options].some((o) => o.value === String(planPreference[key])))
+      $(id).value = String(planPreference[key]);
+  }
+}
 let searchGeneration = 0;
 $("search").onsubmit = async (e) => {
   e.preventDefault();
@@ -1472,6 +1555,19 @@ $("compare-models").onclick = async () => {
     content.append(
       node("p", `${day(validAt)} · ${time(validAt)}`, "detail-summary"),
     );
+    const spread = modelTemperatureSpread(h, index);
+    if (spread) {
+      const summary = node("div", null, "model-spread");
+      summary.append(
+        node("small", `${spread.count} MODELS · SAME VALID HOUR`),
+        node("strong", `${temp(spread.min)} to ${temp(spread.max)}`),
+        node(
+          "p",
+          "Temperature spread across the available models. This is disagreement, not a calibrated confidence interval.",
+        ),
+      );
+      content.append(summary);
+    }
     const table = node("table", null, "model-table"),
       head = node("thead"),
       row = node("tr");

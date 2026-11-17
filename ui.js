@@ -97,6 +97,28 @@ export function initUI() {
   };
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", apply);
   apply();
+  for (const [id, key, attribute, defaultValue] of [
+    ["home-focus", "truecast-home-focus", "homeFocus", "weather"],
+    ["motion-mode", "truecast-motion", "motion", "system"],
+    ["type-size", "truecast-reading-size", "readingSize", "standard"],
+  ]) {
+    const input = $(id);
+    try {
+      input.value = localStorage.getItem(key) || defaultValue;
+    } catch {
+      input.value = defaultValue;
+    }
+    const apply = () => {
+      document.body.dataset[attribute] = input.value;
+      if (attribute === "homeFocus")
+        window.dispatchEvent(new Event("truecast:home-focus"));
+      try {
+        localStorage.setItem(key, input.value);
+      } catch {}
+    };
+    input.onchange = apply;
+    apply();
+  }
   const dailyMode = storeDailyMode();
   function storeDailyMode() {
     try {

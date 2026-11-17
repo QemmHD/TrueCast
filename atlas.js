@@ -107,7 +107,8 @@ export function createAtlas({
     controller,
     lastLoad = 0,
     busy = false,
-    retryAt = 0;
+    retryAt = 0,
+    lastSample = null;
   const panel = $("atlas-focus"),
     catalog = $("layer-catalog");
   const distance = (n) =>
@@ -305,7 +306,24 @@ export function createAtlas({
     );
     showSheet("Lightning map guide", content);
   }
+  function sampleDescription(value) {
+    return value.available
+      ? `${value.value === null ? "Sample unavailable" : densityLabel(value.value) + " strikes/km²/min"} · 15 min ending ${stamp(value.time)}`
+      : "Outside the NOAA source coverage";
+  }
+  function updateLabels() {
+    if (
+      lastSample &&
+      getLayer() === "lightning" &&
+      lastSample.body.isConnected
+    ) {
+      const text = sampleDescription(lastSample.value),
+        p = lastSample.body.querySelector("p");
+      if (p && p.textContent !== text) p.textContent = text;
+    }
+  }
   async function sample(time) {
+    lastSample = null;
     if (getLayer() !== "lightning" || !isVisible()) return;
     const own = ++generation;
     controller?.abort();
@@ -328,9 +346,8 @@ export function createAtlas({
       });
       if (own !== generation || getLayer() !== "lightning") return;
       body.querySelector("strong").textContent = lightningText(value);
-      body.querySelector("p").textContent = value.available
-        ? `${value.value === null ? "Sample unavailable" : densityLabel(value.value) + " strikes/km²/min"} · 15 min ending ${stamp(value.time)}`
-        : "Outside the NOAA source coverage";
+      body.querySelector("p").textContent = sampleDescription(value);
+      lastSample = { value, body };
       body.append(
         node(
           "small",
@@ -525,6 +542,7 @@ export function createAtlas({
   }
   function activate(kind) {
     stop();
+    lastSample = null;
     clearVectors();
     panel.hidden = true;
     lastLoad = 0;
@@ -567,6 +585,7 @@ export function createAtlas({
     refresh,
     stop,
     updateSelected,
+    updateLabels,
     savedLocations,
     mount(pane) {
       basemapPane = pane;

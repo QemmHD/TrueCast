@@ -1,3 +1,15 @@
+# TrueCast Horizon 5.0 review
+
+17 November 2026. [Release notes](HORIZON-RELEASE.md) and [research decisions](HORIZON-RESEARCH.md).
+
+- Thirty-one unit scenarios cover the previous data/source boundaries plus complete future outdoor windows, missing values and gust limits, ranking/non-overlap, real model spread, DST-safe escaped/folded calendar output, graph-coordinate selection and bounded/cancelled image buffering.
+- The new browser suite verifies direct mouse/touch/keyboard exploration, vertical scrolling without an accidental hour change, night/gust chart state, consistent temperature cards, synchronized strip, weather signals, quiet refresh, actual calendar download data, forecast jumps, decoded frame reuse and persisted home/motion/reading preferences.
+- Slow-metadata review caught a same-viewport frame-reuse problem; the corrected refresh retains the displayed image node. Missing imagery retains the last verified image/time. Source/coverage details remain available in the compact deck.
+- The full existing suite covers warning-source failure/expiry, new prominent serious-warning state, station QC, future playback through zoom, official tracking geometry, five viewport widths, safe areas, offline recovery and a coherent 27-file worker upgrade.
+- Live model guidance, forecast chart interaction, future calendar export, future-image playback/zoom, lightning, light appearance and landscape layouts were exercised. Tests use iPhone-size Chromium emulation; physical Safari/native-system certification and universal accuracy superiority are not claimed.
+
+---
+
 # TrueCast Observatory 4.2 review
 
 17 November 2026. [Release/source notes](OBSERVATORY-RELEASE.md).

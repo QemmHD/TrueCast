@@ -38,9 +38,7 @@
     <script defer="" src="./install.js"></script>
     <title>TrueCast · Weather, in perspective.</title>
     <link href="./vendor/leaflet.css" rel="stylesheet" />
-    <link href="./style.css" rel="stylesheet" />
-    <link href="./atmosphere.css" rel="stylesheet" />
-    <link href="./observatory.css" rel="stylesheet" />
+    <link href="./app.css" rel="stylesheet" />
     <script defer="" src="./vendor/leaflet.js"></script>
     <script src="./app.js" type="module"></script>
   </head>
@@ -126,6 +124,12 @@
         class="app-screen today-screen"
         data-screen="today"
       >
+        <button class="priority-alert" id="priority-alert" hidden>
+          <span
+            ><small id="priority-alert-label">OFFICIAL WARNING</small
+            ><strong id="priority-alert-title"></strong></span
+          ><span aria-hidden="true">›</span>
+        </button>
         <div class="current-sky">
           <div aria-hidden="true" class="sky-noise"></div>
           <div aria-hidden="true" class="sky-aura"></div>
@@ -139,6 +143,25 @@
               d="M-40 245Q170 75 640 215M-40 270Q170 100 640 240M-40 295Q170 125 640 265M-40 320Q170 150 640 290"
             />
             <path d="M-30 220Q180 50 630 190" class="horizon-glint" />
+          </svg>
+          <svg
+            class="sky-landscape"
+            aria-hidden="true"
+            viewBox="0 0 640 300"
+            preserveAspectRatio="none"
+          >
+            <path
+              class="ridge-far"
+              d="M0 225Q90 165 185 198T360 179T640 160V300H0Z"
+            />
+            <path
+              class="ridge-mid"
+              d="M0 253Q110 199 236 231T446 201T640 231V300H0Z"
+            />
+            <path
+              class="ridge-near"
+              d="M0 274Q135 233 278 265T501 245T640 263V300H0Z"
+            />
           </svg>
           <div class="current-top">
             <span id="date">YOUR LOCAL FORECAST</span
@@ -352,8 +375,8 @@
             </select>
           </div>
           <div class="forecast-intro">
-            <span class="eyebrow">THE HOURS AHEAD</span>
-            <h2>See the day unfold.</h2>
+            <span class="eyebrow">FORECAST EXPLORER</span>
+            <h2>Every hour, in perspective.</h2>
             <p id="forecast-story">Your forecast, hour by hour.</p>
           </div>
           <div class="selected-forecast">
@@ -374,6 +397,12 @@
           ><input id="forecast-scrub" max="23" min="0" type="range" value="0" />
           <div class="hours" id="hours"></div>
           <div aria-live="polite" class="hour-detail" id="hour-detail"></div>
+          <section class="forecast-signals">
+            <div class="section-line">
+              <span>YOUR NEXT 24 HOURS</span><span>Model-based signals</span>
+            </div>
+            <div id="weather-signals" class="weather-signals"></div>
+          </section>
         </div>
         <div hidden="" id="daily-view">
           <div class="outlook-intro">
@@ -490,7 +519,7 @@
               ↻
             </button>
           </div>
-          <p id="weather-run" class="weather-run">Checking model run…</p>
+
           <div class="weather-playback">
             <button id="weather-play" aria-label="Play weather map timeline">
               <span class="play-icon" aria-hidden="true"></span></button
@@ -515,7 +544,11 @@
             ><span id="weather-end">+72 HOURS</span>
           </div>
           <div id="weather-legend" class="weather-legend"></div>
-          <p class="map-source" id="weather-source"></p>
+          <details class="map-context" id="weather-context">
+            <summary>Source & model run</summary>
+            <p id="weather-run" class="weather-run">Checking model run…</p>
+            <p class="map-source" id="weather-source"></p>
+          </details>
         </div>
         <div class="radar-console" id="radar-console">
           <div
@@ -564,8 +597,12 @@
               ><span>HEAVY</span><span id="radar-age"></span>
             </div>
           </div>
-          <p id="radar-availability" class="map-source"></p>
-          <p id="radar-blend-note" class="map-source"></p>
+          <details class="map-context" id="radar-context">
+            <summary>Source, coverage & playback</summary>
+            <p id="radar-availability" class="map-source"></p>
+            <p id="radar-blend-note" class="map-source"></p>
+            <p class="map-source" id="map-source">Checking source…</p>
+          </details>
           <div hidden="" id="tracking-summary">
             <p id="tracking-text">Loading official data…</p>
             <div class="tracking-actions">
@@ -573,9 +610,6 @@
               ><button id="tracking-fit">Show all</button>
             </div>
           </div>
-          <p class="map-source" id="map-source">
-            RainViewer · Radar coverage varies
-          </p>
         </div>
       </section>
       <section
@@ -586,10 +620,10 @@
       >
         <div class="plan-heading">
           <span class="eyebrow">A BETTER WINDOW</span>
-          <h2>Find your time<br />outside.</h2>
+          <h2>A little more<br />time outside.</h2>
           <p>
-            Pick an activity. We'll find a daylight window with comfortable
-            conditions.
+            Find the hours that fit your plans. Compare complete daylight
+            windows, then take one with you.
           </p>
         </div>
         <button class="sun-strip surface" data-detail="sun">
@@ -626,6 +660,14 @@
             </select></label
           >
         </div>
+        <label for="plan-priority" class="plan-priority"
+          ><span>Choose your window</span
+          ><select id="plan-priority">
+            <option value="balanced">Best fit</option>
+            <option value="earliest">Soonest</option>
+            <option value="calm">Calmest</option>
+          </select></label
+        >
         <div class="window surface" id="window">
           Checking the next 72 hours…
         </div>
@@ -634,7 +676,8 @@
           <summary>How we choose your window</summary>
           <p class="fine" id="plan-criteria"></p>
           <p class="fine">
-            This is a comfort guide, not a safety forecast. Weather can change
+            Calendar actions download an event file for your calendar app. This
+            is a comfort guide, not a safety forecast. Weather can change
             between hourly samples. Always review official warnings.
           </p>
         </details>
@@ -652,12 +695,12 @@
           <img alt="" height="48" src="./icons/icon-192.png" width="48" />
           <div>
             <h2>TrueCast</h2>
-            <p id="app-install-status">Your daily weather companion.</p>
+            <p id="app-install-status">Your weather, your way.</p>
           </div>
-          <span class="version-pill">4.2</span>
+          <span class="version-pill">5.0</span>
         </div>
         <div class="surface settings-group">
-          <h3>Make it yours</h3>
+          <h3>Appearance & comfort</h3>
           <label class="setting-row" for="theme"
             ><span>Appearance</span
             ><select id="theme">
@@ -672,6 +715,27 @@
               °F / °C
             </button>
           </div>
+          <label class="setting-row" for="home-focus"
+            ><span>Home shortcuts</span
+            ><select id="home-focus">
+              <option value="weather">Weather essentials</option>
+              <option value="storm">Stormwatch</option>
+            </select></label
+          >
+          <label class="setting-row" for="motion-mode"
+            ><span>Motion</span
+            ><select id="motion-mode">
+              <option value="system">Follow device</option>
+              <option value="reduced">Reduced</option>
+            </select></label
+          >
+          <label class="setting-row" for="type-size"
+            ><span>Reading size</span
+            ><select id="type-size">
+              <option value="standard">Standard</option>
+              <option value="larger">Larger</option>
+            </select></label
+          >
           <label class="setting-row" for="measurements"
             ><span>Measurements</span
             ><select id="measurements">

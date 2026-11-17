@@ -177,6 +177,11 @@ const { epoch, forecast } = require("./fixtures.cjs");
     await page.waitForFunction(
       () => document.querySelector("#alert-count").textContent === "1",
     );
+    assert.equal(await page.locator("#priority-alert").isVisible(), true);
+    assert.match(
+      await page.locator("#priority-alert-title").innerText(),
+      /Test warning/,
+    );
     const original = await page.locator("#temperature").innerText();
     await page.locator("[data-nav=forecast]").click();
     await page.locator("#horizon").selectOption("144");
@@ -253,6 +258,7 @@ const { epoch, forecast } = require("./fixtures.cjs");
       await page.locator("#detail-content").innerText(),
       /No active NWS/,
     );
+    assert.equal(await page.locator("#priority-alert").isVisible(), false);
     await page.locator("#close-detail").click();
     await page.locator("[data-nav=forecast]").click();
     console.log(

@@ -150,7 +150,9 @@ const iso = (t) => new Date(t).toISOString();
       () =>
         document.querySelector("#radar-time").dataset.frameType === "forecast",
     );
+    await p.locator("#radar-context > summary").click();
     assert.match(await p.locator("#map-source").innerText(), /HRRR.*Iowa/);
+    await p.locator("#radar-context > summary").click();
     assert.ok(tileRequests.some((u) => u.includes("REFD-F0105-202611161100")));
     await p.locator("#play").click();
     await p.waitForFunction(
@@ -256,6 +258,7 @@ const iso = (t) => new Date(t).toISOString();
     await p.waitForFunction(() =>
       document.querySelector("#map-source").textContent.includes("RainViewer"),
     );
+    await p.locator("#radar-context > summary").click();
     assert.match(
       await p.locator("#radar-availability").innerText(),
       /Global history is limited by RainViewer/,

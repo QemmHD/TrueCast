@@ -1,3 +1,5 @@
+import { reducedMotion } from "./api.js";
+import { createImageBuffer } from "./image-buffer.js";
 import { $, node, store } from "./api.js";
 
 export const MAP_PRODUCTS = {
@@ -233,10 +235,10 @@ export function createWeatherMaps({
     refreshing = false,
     retryAt = 0,
     activation = 0,
-    finishCandidate,
     viewQueued = false,
     lightningMinutes = 30;
-  const metadataCache = new Map();
+  const metadataCache = new Map(),
+    imageBuffer = createImageBuffer();
   const spec = () => MAP_PRODUCTS[mode === "forecast" ? product : mode];
   const short = (t) =>
     new Intl.DateTimeFormat("en", {
@@ -258,8 +260,7 @@ export function createWeatherMaps({
   function cancel() {
     ++requestToken;
     controller?.abort();
-    finishCandidate?.(false);
-    finishCandidate = null;
+    imageBuffer.clear({ except: [displayed?.url] });
     remove(candidate);
     candidate = null;
     clearTimeout(timer);
@@ -273,6 +274,7 @@ export function createWeatherMaps({
     remove(overlay);
     overlay = null;
     displayed = null;
+    imageBuffer.clear();
     metadata = null;
     times = [];
   }
@@ -438,48 +440,16 @@ export function createWeatherMaps({
     store.set(`truecast-map-v4-${key}`, cached);
     return body;
   }
-  async function show(index, forceView = false) {
-    if (!isActive() || document.hidden || !times.length) return false;
-    const time = times[index];
-    if (!Number.isFinite(time)) return false;
-    requestedIndex = index;
-    const own = ++requestToken,
-      p = spec(),
+  function frameRequest(time) {
+    const p = spec(),
       map = getMap();
-    finishCandidate?.(false);
-    finishCandidate = null;
-    remove(candidate);
-    candidate = null;
-    const currentProduct = mode === "forecast" ? product : mode;
-    presentation();
-    if (
-      !forceView &&
-      displayed?.time === time &&
-      displayed.product === currentProduct
-    ) {
-      status(
-        mode === "forecast"
-          ? "Model forecast · not observed radar"
-          : "Observed map · gaps are not an all-clear",
-      );
-      announceFrame();
-      return true;
-    }
-    if (!navigator.onLine) {
-      status("Offline · displayed weather map is saved");
-      return false;
-    }
-    status(
-      `Loading ${p.title.toLowerCase()} frame${displayed ? " · previous image remains labeled" : ""}…`,
-    );
     const bounds = map.getBounds(),
       west = Math.max(-180, bounds.getWest()),
       east = Math.min(180, bounds.getEast()),
       south = Math.max(-85, bounds.getSouth()),
       north = Math.min(85, bounds.getNorth());
     if (east <= west || north <= south) {
-      status("Move the map into a supported geographic view.");
-      return false;
+      return null;
     }
     const sw = L.CRS.EPSG3857.project(L.latLng(south, west)),
       ne = L.CRS.EPSG3857.project(L.latLng(north, east)),
@@ -504,31 +474,83 @@ export function createWeatherMaps({
         new Date(metadata.reference).toISOString(),
       );
     const url = `${p.url || "https://maps.dwd.de/geoserver/wms"}?${params}`;
-    const image = L.imageOverlay(
+    return {
       url,
-      [
+      bounds: [
         [south, west],
         [north, east],
       ],
-      { pane: "weather", opacity: 0, interactive: false, crossOrigin: true },
+    };
+  }
+  async function show(index, forceView = false) {
+    if (!isActive() || document.hidden || !times.length) return false;
+    const time = times[index];
+    if (!Number.isFinite(time)) return false;
+    requestedIndex = index;
+    const own = ++requestToken,
+      p = spec(),
+      map = getMap();
+    remove(candidate);
+    candidate = null;
+    const currentProduct = mode === "forecast" ? product : mode;
+    presentation();
+    if (
+      !forceView &&
+      displayed?.time === time &&
+      displayed.product === currentProduct
+    ) {
+      status(
+        mode === "forecast"
+          ? "Model forecast · not observed radar"
+          : "Observed map · gaps are not an all-clear",
+      );
+      announceFrame();
+      return true;
+    }
+    if (!navigator.onLine) {
+      status("Offline · displayed weather map is saved");
+      return false;
+    }
+    status(
+      `Loading ${p.title.toLowerCase()} frame${displayed ? " · previous image remains labeled" : ""}…`,
     );
-    candidate = image;
-    const success = await new Promise((resolve) => {
-      const finish = (ok) => {
-        clearTimeout(timeout);
-        image.off("load", loaded);
-        image.off("error", failed);
-        if (finishCandidate === finish) finishCandidate = null;
-        resolve(ok);
-      };
-      const loaded = () => finish(true),
-        failed = () => finish(false),
-        timeout = setTimeout(() => finish(false), 25000);
-      finishCandidate = finish;
-      image.once("load", loaded);
-      image.once("error", failed);
+    const request = frameRequest(time);
+    if (!request) {
+      status("Move the map into a supported geographic view.");
+      return false;
+    }
+    const { url, bounds } = request;
+    if (displayed?.url === url && overlay?.getElement()?.isConnected) {
+      overlay.setBounds(bounds);
+      overlay.setOpacity(getOpacity());
+      presentation();
+      announceFrame();
+      status(
+        mode === "forecast"
+          ? "Forecast field · not observed radar"
+          : "Observed map · gaps are not an all-clear",
+      );
+      return true;
+    }
+    imageBuffer.protect([displayed?.url, url]);
+    let element,
+      success = false,
+      image;
+    try {
+      element = await imageBuffer.load(url);
+      success = element.complete && element.naturalWidth > 0;
+    } catch {}
+    if (own !== requestToken || !isActive()) return false;
+    if (success) {
+      image = L.imageOverlay(element, bounds, {
+        pane: "weather",
+        opacity: 0,
+        interactive: false,
+        crossOrigin: true,
+      });
+      candidate = image;
       image.addTo(map);
-    });
+    }
     if (own !== requestToken || !isActive()) {
       remove(image);
       return false;
@@ -553,11 +575,7 @@ export function createWeatherMaps({
       return false;
     }
     const previous = overlay;
-    if (
-      previous &&
-      !moving &&
-      !matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
+    if (previous && !moving && !reducedMotion()) {
       const start = performance.now();
       await new Promise((resolve) => {
         const blend = (at) => {
@@ -583,12 +601,20 @@ export function createWeatherMaps({
     remove(previous);
     displayed = {
       product: currentProduct,
+      url,
       time,
       reference: metadata.reference,
       metadata,
       times: [...times],
     };
     retryAt = 0;
+    imageBuffer.protect([url]);
+    if (playing && !moving) {
+      const urls = [1, 2].map(
+        (offset) => frameRequest(times[(index + offset) % times.length])?.url,
+      );
+      imageBuffer.prefetch(urls);
+    }
     presentation();
     announceFrame();
     const place = getPlace(),
@@ -725,6 +751,7 @@ export function createWeatherMaps({
   $("weather-play").onclick = () => {
     if (playing) stop();
     else {
+      clearTimeout(timer);
       playing = true;
       $("weather-play").replaceChildren(node("span", null, "pause-icon"));
       $("weather-play").setAttribute(

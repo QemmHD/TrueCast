@@ -1,3 +1,4 @@
+import { reducedMotion } from "./api.js";
 import { $, node, json, store } from "./api.js";
 import {
   parseMapMetadata,
@@ -375,7 +376,7 @@ export function createRadarTimeline({
         animate &&
         old &&
         old.frame.variable === frame.variable &&
-        !matchMedia("(prefers-reduced-motion: reduce)").matches
+        !reducedMotion()
       ) {
         const duration = 400 / speed,
           start = performance.now();

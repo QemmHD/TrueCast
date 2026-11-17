@@ -3,9 +3,7 @@ const CACHE = "truecast-shell-v4";
 const ROOT = new URL("./", self.location.href);
 const SHELL = [
   "index.html",
-  "style.css",
-  "atmosphere.css",
-  "observatory.css",
+  "app.css",
   "vendor/leaflet.css",
   "vendor/leaflet.js",
   "app.js",
@@ -22,6 +20,9 @@ const SHELL = [
   "radar.js",
   "radar-timeline.js",
   "forecast-strip.js",
+  "forecast-chart.js",
+  "weather-intelligence.js",
+  "image-buffer.js",
   "ui.js",
   "install.js",
   "manifest.webmanifest",

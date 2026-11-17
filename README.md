@@ -1,4 +1,4 @@
-# TrueCast Observatory 4.2
+# TrueCast Horizon 5.0
 
 An installable, dark weather app served from GitHub Pages. No framework build or API keys are required for this personal, noncommercial edition.
 
@@ -6,6 +6,12 @@ An installable, dark weather app served from GitHub Pages. No framework build or
 **Repository:** https://github.com/QemmHD/TrueCast
 
 ## In this release
+
+- A cohesive atmospheric redesign across all five screens, optional Stormwatch shortcuts, prominent severe-warning entry, reduced motion and larger reading preferences.
+- An interactive forecast chart with direct touch/keyboard exploration, labeled axes, source-based night shading, rain bars and wind/gust guidance. Hourly temperatures stay visible across chart metrics.
+- A next-24-hour weather-signal panel and clearly labeled same-hour model spread.
+- Rebuilt outdoor windows ranked by Best fit, Soonest or Calmest, with complete-future-hour checks, gust criteria, forecast jumps and downloadable calendar events.
+- A compact map playback deck and bounded decoded-frame prefetch, preserving source identity, timestamps and failed-frame behavior.
 
 - A dedicated lightning view with 10/20/30-mile or kilometer reference rings, actual local density samples, observed history and source age. Density cannot provide an exact closest-strike distance.
 - A searchable grouped map-layer picker, dark/standard basemap, saved-place pins, NIFC reported fire incidents and NOAA/SPC day-one storm-outlook polygons.
@@ -49,7 +55,7 @@ Weather, air quality and supported local US alerts are checked about every ten s
 
 ## Local development and review
 
-Run `python3 -m http.server 8766` in this folder and open http://127.0.0.1:8766/.
+Run `npm start` in this folder and open http://127.0.0.1:8766/.
 
 For browser review: `npm ci`, `npx playwright install chromium`, then `npm test` while the server is running. `TRUECAST_URL` overrides the test target; `TRUECAST_BROWSER_PATH` optionally selects a browser executable. Tests include deterministic freshness/clock/DST and refresh-flow checks, actual service-worker upgrade/offline tests, live weather/radar checks and clearly separated synthetic warning/cyclone fixtures for states absent in the live feed. Synthetic data is never included in the published app.
 
@@ -57,7 +63,7 @@ The deployment workflow uploads only app files, icons and licensed vendor assets
 
 ## Data and limits
 
-Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: NOAA MRMS in US coverage, RainViewer elsewhere. US future reflectivity: NOAA HRRR via Iowa Environmental Mesonet. Global future fields: DWD ICON. Observed lightning density and infrared satellite: NOAA nowCOAST. Warnings, independent official forecast/observations and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See [OBSERVATORY-RELEASE.md](OBSERVATORY-RELEASE.md) for 4.2 sources, screenshot-inspired features and limitations, [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md) for 4.1 radar sources, playback and refresh behavior, [ATMOSPHERE-RELEASE.md](ATMOSPHERE-RELEASE.md) for 4.0 sources, screenshot checks and validation, [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) for the expanded provider/refresh review, [COMPETITOR-RESEARCH.md](COMPETITOR-RESEARCH.md) for app comparisons and [REVIEW.md](REVIEW.md) for validation.
+Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: NOAA MRMS in US coverage, RainViewer elsewhere. US future reflectivity: NOAA HRRR via Iowa Environmental Mesonet. Global future fields: DWD ICON. Observed lightning density and infrared satellite: NOAA nowCOAST. Warnings, independent official forecast/observations and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See [HORIZON-RELEASE.md](HORIZON-RELEASE.md) for 5.0 behavior and validation, [HORIZON-RESEARCH.md](HORIZON-RESEARCH.md) for the product/source research, [OBSERVATORY-RELEASE.md](OBSERVATORY-RELEASE.md) for 4.2 sources, screenshot-inspired features and limitations, [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md) for 4.1 radar sources, playback and refresh behavior, [ATMOSPHERE-RELEASE.md](ATMOSPHERE-RELEASE.md) for 4.0 sources, screenshot checks and validation, [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) for the expanded provider/refresh review, [COMPETITOR-RESEARCH.md](COMPETITOR-RESEARCH.md) for app comparisons and [REVIEW.md](REVIEW.md) for validation.
 
 Open-Meteo's hosted free tier is noncommercial; queries are weighted by variables/models and have rate limits. RainViewer's public service targets personal/educational/small community use. OpenStreetMap public tiles require normal browser caching, visible attribution and no bulk/offline tile downloading. An expanding commercial product needs suitable provider licensing and hosting.
 
@@ -66,3 +72,5 @@ There is no individual-strike lightning feed, minute-specific rain nowcast, raw 
 Saved locations/preferences remain on this device. Selected coordinates go to the requested weather providers; map tiles go to OpenStreetMap, NOAA, Iowa Environmental Mesonet, RainViewer and DWD. No analytics, user account or API secrets are included. See the in-app coverage/privacy section for details.
 
 Moon illumination uses SunCalc's BSD-2-Clause algorithm; its license is retained in the source and vendor directory. Fire reports use NIFC / WFIGS via public ArcGIS queries, and day-one storm outlooks use NOAA / SPC. These are reports and forecast areas, not exact fire edges, fire-risk ratings or replacements for current official warnings.
+
+Style sources are bundled into `app.css` with `python3 scripts/build-css.py`; start, tests and deployment rebuild it. The published app uses one application stylesheet plus the locally bundled map-library stylesheet. Component CSS sources remain in the repository for maintenance.
