@@ -530,7 +530,7 @@ body[data-night="true"] .sky-noise {
   background: #9db5d707;
 }
 .hours .hour[aria-pressed="true"] {
-  background: #31465f;
+  background: var(--hour-selected);
   border-color: #adc8e655;
   box-shadow: inset 0 1px #d9e8f00b;
 }
@@ -550,7 +550,7 @@ body[data-night="true"] .sky-noise {
 }
 .hour .rain-chance {
   font-size: 10px;
-  color: #99cfe9;
+  color: var(--rain);
 }
 .hour-detail {
   display: grid;
@@ -1849,9 +1849,11 @@ body[data-weather="wet"] .sky-landscape {
 }
 :root {
   --wind: #c2b1ed;
+  --hour-selected: #31465f;
 }
 :root[data-theme="light"] {
   --wind: #735ba3;
+  --hour-selected: #d5e4ee;
 }
 .weather-chart.chart-temperature {
   --chart-color: var(--warm);
@@ -1931,6 +1933,7 @@ body[data-weather="wet"] .sky-landscape {
     --rain: #236d91;
     --warm: #985c24;
     --wind: #735ba3;
+    --hour-selected: #d5e4ee;
     --nav: #eff5faf5;
   }
   :root[data-theme="system"] .app-header,
