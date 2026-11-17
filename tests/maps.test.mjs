@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { expandTimes, usableMapTimes } from "../weather-maps.js";
+import { expandTimes, usableMapTimes, MAP_PRODUCTS } from "../weather-maps.js";
 import { aqiCategory } from "../environment.js";
 const now = Date.parse("2026-11-16T12:30Z"),
   reference = Date.parse("2026-11-16T12:00Z");
@@ -55,4 +55,19 @@ test("air quality zero is a measured model value, while missing data stays unava
   assert.equal(aqiCategory(51), "Moderate");
   assert.equal(aqiCategory(151), "Unhealthy");
   assert.equal(aqiCategory(301), "Hazardous");
+});
+
+test("precipitation playback excludes the advertised three-hour gaps between real six-hour images", () => {
+  const run = Date.parse("2026-11-16T18:00Z"),
+    clock = Date.parse("2026-11-17T00:30Z");
+  const times = expandTimes("2026-11-15T18:00Z/2026-11-24T00:00Z/PT3H");
+  const frames = usableMapTimes(
+    { times, reference: run },
+    { now: clock, step: MAP_PRODUCTS.precip.step },
+  );
+  assert.equal(frames[0], Date.parse("2026-11-17T06:00Z"));
+  assert.equal(frames[1], Date.parse("2026-11-17T12:00Z"));
+  assert.ok(frames.every((t) => (t - run) % 21600000 === 0));
+  assert.ok(!frames.includes(Date.parse("2026-11-17T03:00Z")));
+  assert.ok(frames.length > 1);
 });

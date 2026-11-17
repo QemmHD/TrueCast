@@ -6,7 +6,8 @@ export const MAP_PRODUCTS = {
     title: "Precipitation",
     description:
       "Six-hour precipitation total ending at the selected time. Includes liquid-water equivalent of rain and snow.",
-    step: 10800,
+    // The advertised WMS interval is 3h, but this product has native 6h frames.
+    step: 21600,
     window: 21600,
   },
   temperature: {
@@ -722,7 +723,7 @@ export function createWeatherMaps({
         content.append(
           node(
             "p",
-            "Six-hour windows overlap when stepping by three hours. Do not add overlapping frames together. This is not a minute-specific rain arrival prediction.",
+            "Precipitation frames advance in six-hour steps. Each image is the six-hour total ending at its timestamp. This is not a minute-specific rain arrival prediction.",
             "fine",
           ),
         );

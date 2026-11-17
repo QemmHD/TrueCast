@@ -37,7 +37,7 @@ The service advertises global `Icon_reg025_fd_sl_TOTPREC06H`, `T2M`, `UV10M` and
 
 Live tests returned PNGs for all four forecast products at future times. An intentionally invalid reference time returned an `InvalidDimensionValue` service exception, confirming that the run parameter is honored. Such exceptions can arrive with HTTP 200, so the app requires the image itself to load before changing the displayed product/timestamp.
 
-The native grid is approximately 0.25°, not street-level. Six-hour precipitation totals overlap when stepped every three hours; they must not be summed as independent windows. The point forecast uses Open-Meteo's regional best match and can differ from the ICON map. Temperature legend boundaries are converted to Fahrenheit when selected. Pressure source contours retain hPa labels; wind uses source barbs rather than invented storm-motion particles.
+The native grid is approximately 0.25°, not street-level. Correction in 4.1.1: although the WMS advertises three-hour slots for six-hour precipitation totals, live requests verified that only six-hour steps serve images. The app now uses those native six-hour frames to avoid playback failures. The point forecast uses Open-Meteo's regional best match and can differ from the ICON map. Temperature legend boundaries are converted to Fahrenheit when selected. Pressure source contours retain hPa labels; wind uses source barbs rather than invented storm-motion particles.
 
 ### NOAA lightning density
 

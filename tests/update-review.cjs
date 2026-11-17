@@ -22,7 +22,7 @@ const server = createServer(async (req, res) => {
       );
     if (filename.endsWith("index.html"))
       body = Buffer.from(
-        body.toString().replace(">4.1</span>", `>review-${version}</span>`),
+        body.toString().replace(">4.1.1</span>", `>review-${version}</span>`),
       );
     const ext = path.extname(filename),
       types = {

@@ -107,6 +107,15 @@ function capabilities(layer, observed) {
           time: Date.parse(params.get("time")),
           run: Date.parse(params.get("dim_reference_time")),
         });
+        // DWD advertises 3h slots for this product but only serves native 6h images.
+        if (
+          params.get("layers").endsWith("TOTPREC06H") &&
+          (Date.parse(params.get("time")) - reference) % 21600000 !== 0
+        )
+          return route.fulfill({
+            contentType: "application/xml",
+            body: '<ServiceExceptionReport><ServiceException code="InvalidDimensionValue" locator="time">No matching time</ServiceException></ServiceExceptionReport>',
+          });
         if (imageMode === "pending") {
           held.push(route);
           return;
@@ -183,6 +192,56 @@ function capabilities(layer, observed) {
     );
     console.log(
       "PASS future map requests use a future valid time and explicit model run; timeline loads another real image",
+    );
+    // Exercise actual playback, including wraparound and movement, rather than only scrubbing.
+    await p.locator("#weather-frame").evaluate((n) => {
+      n.value = n.max;
+      n.dispatchEvent(new Event("input"));
+    });
+    await p.waitForFunction(
+      (t) =>
+        Number(document.querySelector("#weather-time").dataset.validAt) > t,
+      displayed,
+    );
+    const finalFrame = Number(
+      await p.locator("#weather-time").getAttribute("data-valid-at"),
+    );
+    await p.locator("#weather-play").click();
+    await p.waitForFunction(
+      (t) =>
+        Number(document.querySelector("#weather-time").dataset.validAt) < t,
+      finalFrame,
+    );
+    const loopedFrame = Number(
+      await p.locator("#weather-time").getAttribute("data-valid-at"),
+    );
+    await p.locator("#map-zoom-in").click();
+    assert.equal(
+      await p.locator("#weather-play").getAttribute("aria-label"),
+      "Pause weather map timeline",
+    );
+    await p.waitForFunction(
+      (t) =>
+        Number(document.querySelector("#weather-time").dataset.validAt) > t,
+      loopedFrame,
+    );
+    await p.locator("#weather-play").click();
+    await p.waitForTimeout(500);
+    const pausedFrame = await p
+      .locator("#weather-time")
+      .getAttribute("data-valid-at");
+    await p.waitForTimeout(1200);
+    assert.equal(
+      await p.locator("#weather-time").getAttribute("data-valid-at"),
+      pausedFrame,
+    );
+    assert.ok(
+      requests
+        .filter((r) => r.layer.endsWith("TOTPREC06H"))
+        .every((r) => (r.time - r.run) % 21600000 === 0),
+    );
+    console.log(
+      "PASS future precipitation play advances, loops, survives zoom and pauses using only valid six-hour frames",
     );
     imageMode = "pending";
     await p.locator("[data-map-product=temperature]").click();

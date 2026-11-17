@@ -1,3 +1,9 @@
+# TrueCast 4.1.1 future-playback fix
+
+The actual DWD feed rejected advertised intermediate precipitation times with `InvalidDimensionValue`. Native six-hour frame selection fixes the future map's initial load and Play button. Eighteen unit scenarios include the failed-time reproduction; browser checks now explicitly exercise future playback, loop wraparound, zoom continuation and pause. Live playback also completed the 72-hour window and looped. See [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md).
+
+---
+
 # TrueCast Atmosphere 4.1 review
 
 17 November 2026. Current source details and behavior: [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md). Earlier release records below are historical.
