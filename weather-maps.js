@@ -234,7 +234,8 @@ export function createWeatherMaps({
     retryAt = 0,
     activation = 0,
     finishCandidate,
-    viewQueued = false;
+    viewQueued = false,
+    lightningMinutes = 30;
   const metadataCache = new Map();
   const spec = () => MAP_PRODUCTS[mode === "forecast" ? product : mode];
   const short = (t) =>
@@ -333,6 +334,19 @@ export function createWeatherMaps({
         ),
       );
   }
+  function announceFrame() {
+    if (displayed)
+      window.dispatchEvent(
+        new CustomEvent("truecast:map-frame", {
+          detail: {
+            mode,
+            product: displayed.product,
+            time: displayed.time,
+            reference: displayed.reference,
+          },
+        }),
+      );
+  }
   function presentation() {
     const p =
       mode === "forecast" && displayed
@@ -347,6 +361,15 @@ export function createWeatherMaps({
         ),
       );
     $("forecast-products").hidden = mode !== "forecast";
+    $("lightning-history").hidden = mode !== "lightning";
+    document
+      .querySelectorAll("[data-lightning-history]")
+      .forEach((b) =>
+        b.setAttribute(
+          "aria-pressed",
+          String(Number(b.dataset.lightningHistory) === lightningMinutes),
+        ),
+      );
     $("weather-frame").max = Math.max(0, times.length - 1);
     $("weather-frame").value = requestedIndex;
     $("weather-frame").disabled = !times.length || refreshing;
@@ -439,6 +462,7 @@ export function createWeatherMaps({
           ? "Model forecast · not observed radar"
           : "Observed map · gaps are not an all-clear",
       );
+      announceFrame();
       return true;
     }
     if (!navigator.onLine) {
@@ -566,6 +590,7 @@ export function createWeatherMaps({
     };
     retryAt = 0;
     presentation();
+    announceFrame();
     const place = getPlace(),
       outside =
         mode === "lightning" &&
@@ -583,7 +608,16 @@ export function createWeatherMaps({
     );
     return true;
   }
-  async function activate(nextMode, { force = false } = {}) {
+  async function activate(
+    nextMode,
+    { force = false, product: nextProduct } = {},
+  ) {
+    if (
+      nextProduct &&
+      MAP_PRODUCTS[nextProduct] &&
+      !MAP_PRODUCTS[nextProduct].observed
+    )
+      product = nextProduct;
     const activationId = ++activation;
     stop();
     cancel();
@@ -612,6 +646,10 @@ export function createWeatherMaps({
         observed: spec().observed,
         step: spec().step,
       });
+      if (mode === "lightning" && times.length)
+        times = times.filter(
+          (t) => t >= times.at(-1) - lightningMinutes * 60000,
+        );
       if (!times.length) throw new Error("No current source frames");
       requestedIndex =
         spec().observed && wasLatest
@@ -677,6 +715,13 @@ export function createWeatherMaps({
     const index = Number($("weather-frame").value);
     timer = setTimeout(() => show(index), 160);
   };
+  document.querySelectorAll("[data-lightning-history]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        lightningMinutes = Number(b.dataset.lightningHistory);
+        if (mode === "lightning" && isActive()) void activate(mode);
+      }),
+  );
   $("weather-play").onclick = () => {
     if (playing) stop();
     else {

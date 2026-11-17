@@ -40,6 +40,7 @@
     <link href="./vendor/leaflet.css" rel="stylesheet" />
     <link href="./style.css" rel="stylesheet" />
     <link href="./atmosphere.css" rel="stylesheet" />
+    <link href="./observatory.css" rel="stylesheet" />
     <script defer="" src="./vendor/leaflet.js"></script>
     <script src="./app.js" type="module"></script>
   </head>
@@ -305,7 +306,7 @@
         </div>
         <div class="today-actions">
           <button id="all-conditions">
-            All conditions
+            Conditions & lightning
             <span aria-hidden="true"
               ><svg
                 aria-hidden="true"
@@ -385,6 +386,14 @@
           <div class="section-line daily-legend">
             <span>DAY / CONDITIONS</span><span>LOW → HIGH · RAIN</span>
           </div>
+          <div class="daily-display" aria-label="Daily forecast detail">
+            <span>YOUR OUTLOOK</span
+            ><button data-daily-mode="summary" aria-pressed="true">
+              Summary</button
+            ><button data-daily-mode="details" aria-pressed="false">
+              Details
+            </button>
+          </div>
           <div class="days surface" id="days"></div>
           <p class="fine">
             Tap a day for details. Forecast uncertainty grows with lead time.
@@ -436,6 +445,12 @@
           </div>
           <button id="point-forecast">View forecast ›</button>
         </div>
+        <aside
+          id="atlas-focus"
+          class="atlas-focus"
+          aria-live="polite"
+          hidden
+        ></aside>
         <div class="weather-console" id="weather-console" hidden>
           <div
             class="forecast-products"
@@ -451,6 +466,19 @@
             <button data-map-product="wind" aria-pressed="false">Wind</button>
             <button data-map-product="pressure" aria-pressed="false">
               Pressure
+            </button>
+          </div>
+          <div
+            id="lightning-history"
+            class="lightning-history"
+            hidden
+            aria-label="Lightning history window"
+          >
+            <span>OBSERVED HISTORY</span
+            ><button data-lightning-history="30" aria-pressed="true">
+              30 min</button
+            ><button data-lightning-history="120" aria-pressed="false">
+              2 hours
             </button>
           </div>
           <div class="weather-console-heading">
@@ -626,7 +654,7 @@
             <h2>TrueCast</h2>
             <p id="app-install-status">Your daily weather companion.</p>
           </div>
-          <span class="version-pill">4.1.1</span>
+          <span class="version-pill">4.2</span>
         </div>
         <div class="surface settings-group">
           <h3>Make it yours</h3>
@@ -742,6 +770,20 @@
                 target="_blank"
                 >NOAA nowCOAST</a
               >
+              · Fire incidents:
+              <a
+                href="https://www.nifc.gov/fire-information/maps"
+                rel="noopener"
+                target="_blank"
+                >NIFC / WFIGS</a
+              >
+              · Storm outlooks:
+              <a
+                href="https://www.spc.noaa.gov/products/outlook/"
+                rel="noopener"
+                target="_blank"
+                >NOAA / SPC</a
+              >
               · US alerts:
               <a href="https://weather.gov/" rel="noopener" target="_blank"
                 >NWS</a
@@ -752,7 +794,9 @@
               in this browser. Coordinates are sent to weather providers when
               you request a forecast. Maps request imagery from OpenStreetMap,
               RainViewer, DWD, NOAA and Iowa Environmental Mesonet when opened.
-              Air and pollen requests use CAMS via Open-Meteo.
+              Air and pollen requests use CAMS via Open-Meteo. US fire reports
+              use NIFC / WFIGS via ArcGIS, and storm outlook polygons come from
+              NOAA / SPC.
             </p>
           </footer>
         </details>
@@ -852,7 +896,7 @@
     <dialog aria-labelledby="map-dialog-title" id="map-dialog">
       <div aria-hidden="true" class="sheet-handle"></div>
       <div class="dialog-heading">
-        <h2 id="map-dialog-title">Map settings</h2>
+        <h2 id="map-dialog-title">Layers & map</h2>
         <button
           aria-label="Close map settings"
           class="icon-button"
@@ -861,6 +905,27 @@
           ✕
         </button>
       </div>
+      <div class="layer-search">
+        <label for="layer-search" class="sr-only">Find a map layer</label
+        ><input
+          id="layer-search"
+          type="search"
+          placeholder="Find a layer…"
+          autocomplete="off"
+        />
+      </div>
+      <div
+        id="layer-catalog"
+        class="layer-catalog"
+        aria-label="Available map layers"
+      ></div>
+      <label class="setting-row" for="map-style"
+        ><span>Base map</span
+        ><select id="map-style">
+          <option value="dark">Dark</option>
+          <option value="standard">Standard</option>
+        </select></label
+      >
       <label class="setting-row" for="radar-opacity"
         ><span>Layer opacity <output id="opacity-value">75%</output></span
         ><input
@@ -887,10 +952,13 @@
         resolution stops at zoom 7. Zooming closer enlarges the same data.
       </p>
       <p class="fine">
-        Future model maps and NOAA lightning density are available from Maps.
-        Density is not an individual lightning-strike location. Official
-        tropical track cones represent center-track uncertainty, not the
-        complete area of storm impacts.
+        Distance rings are geographic references, not strike locations. Fire
+        reports are incident points, not fire edges or risk ratings. SPC
+        outlooks are forecast areas, separate from current warnings. Future
+        model maps and NOAA lightning density are available from Maps. Density
+        is not an individual lightning-strike location. Official tropical track
+        cones represent center-track uncertainty, not the complete area of storm
+        impacts.
       </p>
     </dialog>
     <noscript

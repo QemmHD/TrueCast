@@ -1,3 +1,15 @@
+# TrueCast Observatory 4.2 review
+
+17 November 2026. [Release/source notes](OBSERVATORY-RELEASE.md).
+
+- Twenty-two unit scenarios passed, including new lightning unit/zero handling, stale or distant fire reports, storm expiry and lunar phase cases.
+- New browser checks passed for lightning rings/density samples, recent-history playback, saved-location pins, search/grouped layer controls, dark/standard maps, direct forecast fields, NIFC report details/zero values and failure states, SPC outlooks, daily Summary/Details and metric/landscape layouts.
+- The existing full suite passed: quiet ten-second checks, cache/rate-limit behavior, future forecast playback through zoom, official warnings/tracks, five viewport sizes, offline recovery and a complete 26-file app-shell upgrade.
+- Live Gatlinburg weather, NOAA GetFeatureInfo samples and image playback, NIFC incident reports and SPC polygons succeeded. Phone screenshots were inspected for the lightning map, layer picker, wind compass, conditions and moon/sun views.
+- A Linux WebKit launch was blocked by missing runtime libraries. These checks do not certify physical iPhone/Safari behavior. Actual strike proximity, fire-edge distance, universal forecast superiority and closed-app monitoring are not claimed.
+
+---
+
 # TrueCast 4.1.1 future-playback fix
 
 The actual DWD feed rejected advertised intermediate precipitation times with `InvalidDimensionValue`. Native six-hour frame selection fixes the future map's initial load and Play button. Eighteen unit scenarios include the failed-time reproduction; browser checks now explicitly exercise future playback, loop wraparound, zoom continuation and pause. Live playback also completed the 72-hour window and looped. See [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md).

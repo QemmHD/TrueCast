@@ -1,3 +1,4 @@
+import { createConditions } from "./conditions.js";
 import { createForecastStrip } from "./forecast-strip.js";
 import { createEnvironment } from "./environment.js";
 import { $, store, node, json, condition, weatherIcon } from "./api.js";
@@ -111,6 +112,17 @@ function savedPlaces() {
     const row = node("div", null, "saved-place"),
       b = node("button", p.name),
       remove = node("button", "✕", "icon-button");
+    b.append(
+      node(
+        "small",
+        `${p.latitude.toFixed(2)}°, ${p.longitude.toFixed(2)}°`,
+        "saved-place-meta",
+      ),
+    );
+    b.setAttribute(
+      "aria-pressed",
+      String(p.latitude === place.latitude && p.longitude === place.longitude),
+    );
     b.onclick = () => load(p);
     remove.setAttribute("aria-label", `Remove ${p.name}`);
     remove.onclick = () => {
@@ -121,6 +133,7 @@ function savedPlaces() {
     row.append(b, remove);
     $("favorites").append(row);
   });
+  window.dispatchEvent(new Event("truecast:saved"));
   const isSaved = saved.some(
     (p) => p.latitude === place.latitude && p.longitude === place.longitude,
   );
@@ -458,6 +471,12 @@ function renderDays() {
         number(d.precipitation_probability_max[i], "%"),
         "rain-chance",
       ),
+      node("span", condition(d.weather_code[i]), "day-condition"),
+      node(
+        "span",
+        `${rain(d.precipitation_sum[i])} precipitation · Wind ${wind(d.wind_speed_10m_max[i])} · UV ${number(d.uv_index_max[i])}`,
+        "day-expanded",
+      ),
     );
     b.onclick = () => {
       detailType = "";
@@ -510,6 +529,18 @@ function showDetail(type) {
       ),
     );
     sheet("Weather details", content);
+    return;
+  }
+  if (type === "all") {
+    conditions.open();
+    return;
+  }
+  if (type === "wind") {
+    conditions.wind();
+    return;
+  }
+  if (type === "sun") {
+    conditions.sun();
     return;
   }
   let title = "All conditions",
@@ -1182,6 +1213,7 @@ $("units").onclick = () => {
 $("measurements").value = measurements;
 $("measurements").onchange = () => {
   measurements = $("measurements").value;
+  window.dispatchEvent(new Event("truecast:measurements"));
   store.set("truecast-measurements", measurements);
   render();
 };
@@ -1322,6 +1354,45 @@ const officialSources = sourceTools({
 $("source-freshness").onclick = showFreshness;
 $("official-outlook").onclick = officialSources.outlook;
 $("station-observation").onclick = officialSources.observation;
+function openMapLayer(layer, product) {
+  detailType = "";
+  $("detail-dialog").close();
+  location.hash = "map";
+  requestAnimationFrame(() =>
+    window.dispatchEvent(
+      new CustomEvent("truecast:map-layer", { detail: { layer, product } }),
+    ),
+  );
+}
+const conditions = createConditions({
+  getData: () => data,
+  getAir: () => air,
+  getPlace: () => place,
+  getMeasurements: () => measurements,
+  temp,
+  wind,
+  rain,
+  pressure,
+  time,
+  todayIndex,
+  start,
+  present: sheet,
+  openMap: openMapLayer,
+  openAir: () => {
+    detailType = "";
+    environment.open();
+  },
+  openStation: () => {
+    detailType = "";
+    officialSources.observation();
+  },
+});
+addEventListener("truecast:air", () => {
+  detailType = "";
+  environment.open();
+});
+addEventListener("truecast:conditions", () => showDetail("all"));
+addEventListener("truecast:saved-place", (e) => load(e.detail));
 const forecastStrip = createForecastStrip({
   rail: $("hours"),
   getSelected: () => selected,

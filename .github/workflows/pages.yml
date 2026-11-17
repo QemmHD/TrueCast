@@ -22,7 +22,7 @@ jobs:
       - name: Prepare public app
         run: |
           mkdir -p _site
-          cp index.html style.css atmosphere.css app.js api.js refresh.js forecast-time.js sources.js weather-maps.js environment.js radar.js radar-timeline.js forecast-strip.js ui.js install.js sw.js manifest.webmanifest .nojekyll _site/
+          cp index.html style.css atmosphere.css observatory.css app.js api.js refresh.js forecast-time.js sources.js weather-maps.js environment.js hazard-data.js conditions.js celestial.js atlas.js radar.js radar-timeline.js forecast-strip.js ui.js install.js sw.js manifest.webmanifest .nojekyll _site/
           cp -r icons _site/icons
           cp -r vendor _site/vendor
       - name: Version the complete app shell

@@ -250,6 +250,21 @@ export function sourceTools({ getPlace, present, temp, wind, measurements }) {
         else if (ob.windSpeed.unitCode !== "wmoUnit:km_h-1") speed = null;
       }
       content.replaceChildren();
+      const verified = (x) =>
+        Number.isFinite(x?.value) && x.qualityControl === "V";
+      const dew = ob.dewpoint;
+      const dewC = verified(dew)
+        ? dew.unitCode === "wmoUnit:degC"
+          ? dew.value
+          : dew.unitCode === "wmoUnit:degF"
+            ? (dew.value - 32) / 1.8
+            : null
+        : null;
+      const stationPressure = ob.seaLevelPressure;
+      const pa =
+        verified(stationPressure) && stationPressure.unitCode === "wmoUnit:Pa"
+          ? stationPressure.value
+          : null;
       content.append(
         node("p", temp(temperature), "detail-summary"),
         node(
@@ -272,6 +287,21 @@ export function sourceTools({ getPlace, present, temp, wind, measurements }) {
             `${(measurements() === "imperial" ? station.distance / 1.609344 : station.distance).toFixed(1)} ${measurements() === "imperial" ? "mi" : "km"}`,
           ],
           ["Wind", wind(speed)],
+          ["Dew point", temp(dewC)],
+          [
+            "Humidity",
+            verified(ob.relativeHumidity)
+              ? `${Math.round(ob.relativeHumidity.value)}%`
+              : "Unavailable",
+          ],
+          [
+            "Sea-level pressure",
+            Number.isFinite(pa)
+              ? measurements() === "imperial"
+                ? `${(pa / 3386.389).toFixed(2)} inHg`
+                : `${Math.round(pa / 100)} hPa`
+              : "Unavailable",
+          ],
           ["Temperature QC", "Passed source verification"],
           ["Retrieved", new Date(result.at).toLocaleString()],
         ]),

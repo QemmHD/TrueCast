@@ -1,3 +1,4 @@
+import { createAtlas } from "./atlas.js";
 import { createRadarTimeline } from "./radar-timeline.js";
 import { createWeatherMaps } from "./weather-maps.js";
 import { $, json, node } from "./api.js";
@@ -48,6 +49,17 @@ export function createRadar({
     getOpacity: () => Number($("radar-opacity").value) / 100,
     isActive: () => kind === "radar" && document.body.dataset.screen === "map",
     status,
+  });
+  const atlas = createAtlas({
+    getMap: () => map,
+    getPlace,
+    getMeasurements,
+    getTimezone,
+    isVisible: () => document.body.dataset.screen === "map",
+    getLayer: () => kind,
+    status,
+    showSheet,
+    selectLayer,
   });
   const remove = (layer) => {
     if (layer && map?.hasLayer(layer)) map.removeLayer(layer);
@@ -111,6 +123,7 @@ export function createRadar({
       timeline.moving(false);
       weatherMaps.requestView();
     });
+    atlas.mount(pane);
     return true;
   }
   const color = (p) =>
@@ -393,7 +406,7 @@ export function createRadar({
         "Active systems could not be checked. Consult nhc.noaa.gov.";
     }
   }
-  async function selectLayer(next, force = false) {
+  async function selectLayer(next, force = false, nextProduct) {
     if (force && next === kind && map) {
       if (Date.now() < retryAt) {
         status("Source retry is delayed. Saved map data is unverified.");
@@ -427,13 +440,23 @@ export function createRadar({
     $("weather-console").hidden = !fieldLayer(kind);
     document.body.dataset.mapLayer = kind;
     if (!init()) return;
+    atlas.activate(kind);
+    if (["fire", "storm"].includes(kind)) {
+      $("radar-console").hidden = true;
+      $("weather-console").hidden = true;
+      $("map-layer-label").textContent =
+        kind === "fire"
+          ? "NIFC REPORTED FIRE INCIDENTS"
+          : "SPC DAY-ONE STORM OUTLOOK";
+      return;
+    }
     if (fieldLayer(kind)) {
       if (kind === "forecast" && !futureViewSet) {
         futureViewSet = true;
         if (map.getZoom() > 5) map.setZoom(5);
       }
       if (document.body.dataset.screen === "map")
-        await weatherMaps.activate(kind, { force });
+        await weatherMaps.activate(kind, { force, product: nextProduct });
       return;
     }
     $("radar-playback").hidden = kind !== "radar";
@@ -617,6 +640,10 @@ export function createRadar({
       return;
     refreshBusy = true;
     try {
+      if (["fire", "storm"].includes(kind)) {
+        await atlas.refresh();
+        return;
+      }
       if (fieldLayer(kind)) {
         await weatherMaps.refresh();
         return;
@@ -656,8 +683,13 @@ export function createRadar({
     else {
       stop();
       weatherMaps.stop();
+      atlas.stop();
     }
   });
+  addEventListener(
+    "truecast:map-layer",
+    (e) => void selectLayer(e.detail.layer, false, e.detail.product),
+  );
   addEventListener("truecast:future-map", () => selectLayer("forecast"));
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
@@ -682,6 +714,7 @@ export function createRadar({
           fieldLayer(kind) ? Math.min(map.getZoom(), 5) : 7,
         );
       }
+      if (map) atlas.setPlace();
       if (map && kind === "radar" && document.body.dataset.screen === "map")
         void timeline.refresh();
     },

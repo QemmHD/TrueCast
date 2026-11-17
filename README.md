@@ -1,4 +1,4 @@
-# TrueCast Atmosphere 4.1
+# TrueCast Observatory 4.2
 
 An installable, dark weather app served from GitHub Pages. No framework build or API keys are required for this personal, noncommercial edition.
 
@@ -6,6 +6,11 @@ An installable, dark weather app served from GitHub Pages. No framework build or
 **Repository:** https://github.com/QemmHD/TrueCast
 
 ## In this release
+
+- A dedicated lightning view with 10/20/30-mile or kilometer reference rings, actual local density samples, observed history and source age. Density cannot provide an exact closest-strike distance.
+- A searchable grouped map-layer picker, dark/standard basemap, saved-place pins, NIFC reported fire incidents and NOAA/SPC day-one storm-outlook polygons.
+- Organized conditions with a wind compass, air/pollen, precipitation, fire reports, UV, calculated moon phase, sun times and modeled conditions beside an independent station link.
+- Daily Summary/Details rows with condition descriptions, rain, wind and UV. Sticky sheet controls and independently scrolling layer lists keep the expanded app usable on phones.
 
 - One radar timeline defaults to **Both**: six hours of NOAA MRMS history and up to six hours of HRRR simulated future reflectivity in US coverage. Past/Future controls filter the bar; NOW marks the boundary.
 - Buffered, bounded frame caching and smooth opacity blending. Zoom/pan keeps playback enabled and resumes frame advancement when the view settles. This blends native frames, not optical-flow storm motion.
@@ -52,10 +57,12 @@ The deployment workflow uploads only app files, icons and licensed vendor assets
 
 ## Data and limits
 
-Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: NOAA MRMS in US coverage, RainViewer elsewhere. US future reflectivity: NOAA HRRR via Iowa Environmental Mesonet. Global future fields: DWD ICON. Observed lightning density and infrared satellite: NOAA nowCOAST. Warnings, independent official forecast/observations and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md) for 4.1 radar sources, playback and refresh behavior, [ATMOSPHERE-RELEASE.md](ATMOSPHERE-RELEASE.md) for 4.0 sources, screenshot checks and validation, [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) for the expanded provider/refresh review, [COMPETITOR-RESEARCH.md](COMPETITOR-RESEARCH.md) for app comparisons and [REVIEW.md](REVIEW.md) for validation.
+Forecast, models and air quality: Open-Meteo/CAMS. Observed radar: NOAA MRMS in US coverage, RainViewer elsewhere. US future reflectivity: NOAA HRRR via Iowa Environmental Mesonet. Global future fields: DWD ICON. Observed lightning density and infrared satellite: NOAA nowCOAST. Warnings, independent official forecast/observations and zone boundaries: NWS. Tropical products: NOAA/NHC. Basemap: OpenStreetMap. Keep visible attribution. See [OBSERVATORY-RELEASE.md](OBSERVATORY-RELEASE.md) for 4.2 sources, screenshot-inspired features and limitations, [RADAR-TIMELINE-RELEASE.md](RADAR-TIMELINE-RELEASE.md) for 4.1 radar sources, playback and refresh behavior, [ATMOSPHERE-RELEASE.md](ATMOSPHERE-RELEASE.md) for 4.0 sources, screenshot checks and validation, [SOURCE-REFRESH-RESEARCH.md](SOURCE-REFRESH-RESEARCH.md) for the expanded provider/refresh review, [COMPETITOR-RESEARCH.md](COMPETITOR-RESEARCH.md) for app comparisons and [REVIEW.md](REVIEW.md) for validation.
 
 Open-Meteo's hosted free tier is noncommercial; queries are weighted by variables/models and have rate limits. RainViewer's public service targets personal/educational/small community use. OpenStreetMap public tiles require normal browser caching, visible attribution and no bulk/offline tile downloading. An expanding commercial product needs suitable provider licensing and hosting.
 
 There is no individual-strike lightning feed, minute-specific rain nowcast, raw Doppler/velocity product, global tropical feed, native widgets or background push service. NOAA-derived lightning density is a regional gridded product, not a nearest-strike distance. Surface wind is not storm-cell motion. Outside US coverage, RainViewer history is generally around two hours, and future precipitation uses coarse DWD six-hour totals rather than simulated reflectivity. No global six-hour radar-history claim is made. The future field maps use DWD spatial fields; model point forecasts alone do not paint them. No forecast superiority claim is made without regional measurement. National warnings remain authoritative; map coverage gaps, failed sources and incomplete geometry must not be shown as safe conditions.
 
 Saved locations/preferences remain on this device. Selected coordinates go to the requested weather providers; map tiles go to OpenStreetMap, NOAA, Iowa Environmental Mesonet, RainViewer and DWD. No analytics, user account or API secrets are included. See the in-app coverage/privacy section for details.
+
+Moon illumination uses SunCalc's BSD-2-Clause algorithm; its license is retained in the source and vendor directory. Fire reports use NIFC / WFIGS via public ArcGIS queries, and day-one storm outlooks use NOAA / SPC. These are reports and forecast areas, not exact fire edges, fire-risk ratings or replacements for current official warnings.

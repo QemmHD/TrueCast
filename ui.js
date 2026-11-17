@@ -2,7 +2,7 @@ import { $ } from "./api.js";
 const routes = {
   today: "Today",
   forecast: "Forecast",
-  map: "Radar",
+  map: "Maps",
   plan: "Plan",
   settings: "More",
 };
@@ -97,6 +97,29 @@ export function initUI() {
   };
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", apply);
   apply();
+  const dailyMode = storeDailyMode();
+  function storeDailyMode() {
+    try {
+      return localStorage.getItem("truecast-daily-mode") || "summary";
+    } catch {
+      return "summary";
+    }
+  }
+  function setDailyMode(mode) {
+    document.body.dataset.dailyMode = mode;
+    document
+      .querySelectorAll("[data-daily-mode]")
+      .forEach((b) =>
+        b.setAttribute("aria-pressed", String(b.dataset.dailyMode === mode)),
+      );
+    try {
+      localStorage.setItem("truecast-daily-mode", mode);
+    } catch {}
+  }
+  setDailyMode(dailyMode);
+  document
+    .querySelectorAll("[data-daily-mode]")
+    .forEach((b) => (b.onclick = () => setDailyMode(b.dataset.dailyMode)));
   function network() {
     $("connection-state").textContent = navigator.onLine ? "Online" : "Offline";
     $("offline-banner").hidden = navigator.onLine;
